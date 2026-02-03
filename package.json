@@ -9,8 +9,9 @@
     "test": "bun test"
   },
   "dependencies": {
-    "grammy": "^1.30.0",
-    "@google/generative-ai": "^0.21.0"
+    "@google/generative-ai": "^0.21.0",
+    "garmin-connect": "^1.6.2",
+    "grammy": "^1.30.0"
   },
   "devDependencies": {
     "@types/bun": "latest"
