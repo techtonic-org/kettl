@@ -7,9 +7,14 @@ import { config } from "../config";
 let client: GarminConnect | null = null;
 let initialized = false;
 let lastAuthFailure: Date | null = null;
+let cachedDisplayName: string | null = null;
 const AUTH_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes cooldown after auth failure
 
 const TOKEN_DIR = join(homedir(), ".garmin-tokens");
+
+// Real-time daily summary endpoint (not the stale stats endpoint)
+const GC_API = "https://connectapi.garmin.com";
+const DAILY_SUMMARY_URL = `${GC_API}/usersummary-service/usersummary/daily`;
 
 export interface InstantVitals {
   steps: number;
@@ -131,6 +136,31 @@ async function withReauth<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+async function getDisplayName(): Promise<string> {
+  if (cachedDisplayName) {
+    return cachedDisplayName;
+  }
+  const profile = await client!.getUserProfile();
+  cachedDisplayName = (profile as any).displayName;
+  if (!cachedDisplayName) {
+    throw new Error("Could not get display name from profile");
+  }
+  return cachedDisplayName;
+}
+
+interface DailySummary {
+  totalSteps?: number;
+  restingHeartRate?: number;
+  currentDayRestingHeartRate?: number;
+  averageStressLevel?: number;
+  maxStressLevel?: number;
+  stressPercentage?: number;
+  bodyBatteryChargedValue?: number;
+  bodyBatteryDrainedValue?: number;
+  bodyBatteryHighestValue?: number;
+  bodyBatteryLowestValue?: number;
+}
+
 export async function getCurrentVitals(): Promise<InstantVitals> {
   if (!client) {
     await initInstantClient();
@@ -140,39 +170,25 @@ export async function getCurrentVitals(): Promise<InstantVitals> {
   }
 
   const today = new Date();
+  const dateStr = today.toISOString().split("T")[0]; // YYYY-MM-DD
 
   return withReauth(async () => {
-    // Get steps
-    const steps = await client!.getSteps(today);
-
-    // Get resting HR and body battery from sleep data
-    let restingHr: number | null = null;
-    let bodyBatteryHigh: number | null = null;
-    let bodyBatteryLow: number | null = null;
-
-    try {
-      const sleepData = await client!.getSleepData(today);
-      restingHr = sleepData?.restingHeartRate ?? null;
-
-      // Extract body battery high/low from sleep data if available
-      if (sleepData?.sleepBodyBattery?.length) {
-        const values = sleepData.sleepBodyBattery.map((b) => b.value);
-        bodyBatteryHigh = Math.max(...values);
-        bodyBatteryLow = Math.min(...values);
-      }
-    } catch {
-      // Sleep data not available, continue without it
-    }
+    // Use real-time daily summary endpoint instead of stale stats endpoint
+    const displayName = await getDisplayName();
+    const summary = await client!.get<DailySummary>(
+      `${DAILY_SUMMARY_URL}/${displayName}`,
+      { params: { calendarDate: dateStr } }
+    );
 
     return {
-      steps: steps ?? 0,
-      restingHr,
-      stressLevel: null, // Not easily available from current API
-      bodyBatteryHigh,
-      bodyBatteryLow,
+      steps: summary.totalSteps ?? 0,
+      restingHr: summary.currentDayRestingHeartRate ?? summary.restingHeartRate ?? null,
+      stressLevel: summary.averageStressLevel ?? null,
+      bodyBatteryHigh: summary.bodyBatteryHighestValue ?? null,
+      bodyBatteryLow: summary.bodyBatteryLowestValue ?? null,
     };
   }).catch((error) => {
-    console.error(`[Instant] Failed to get vitals for ${today.toISOString().split("T")[0]}:`, error);
+    console.error(`[Instant] Failed to get vitals for ${dateStr}:`, error);
     throw error;
   });
 }
