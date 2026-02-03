@@ -167,16 +167,14 @@ export function createBot(): Bot {
     const stopTyping = startTypingIndicator(ctx);
 
     try {
-      // Check data freshness - scheduler handles sync, just warn if stale
+      // Check data freshness - scheduler handles sync, just log staleness
       const lastSync = getLastSyncTime();
 
       if (!lastSync) {
-        warnings.push("SQLite data not yet synced, using instant API");
+        console.log("[SYNC] SQLite data not yet synced, using instant API");
       } else {
         const syncAgeHours = (Date.now() - lastSync.getTime()) / (1000 * 60 * 60);
-        if (syncAgeHours > 4) {
-          warnings.push(`Data is ${Math.floor(syncAgeHours)}h old, using instant API for recent data`);
-        }
+        console.log(`[SYNC] SQLite data is ${syncAgeHours.toFixed(1)}h old`);
       }
 
       // Check memory availability and get prompt
