@@ -58,6 +58,11 @@ export function createBot(): Bot {
     );
   });
 
+  bot.command("clear", async (ctx) => {
+    sessionManager.clear();
+    await ctx.reply("Session cleared. Starting fresh!");
+  });
+
   bot.on("message:text", async (ctx) => {
     const userMessage = ctx.message.text;
     const warnings: string[] = [];
