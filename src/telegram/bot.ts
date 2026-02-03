@@ -7,11 +7,13 @@ import { buildMainPrompt, BOOTSTRAP_PROMPT } from "../prompts";
 import type { PromptContext } from "../prompts";
 import { withTimeout, TimeoutError } from "../utils/timeout";
 import { appendChat } from "../chats/store";
+import { SessionManager } from "./session-manager";
 
 // Ensure tools are registered
 import "../tools";
 
 let bot: Bot | null = null;
+const sessionManager = new SessionManager();
 
 // Keep typing indicator alive during long operations
 function startTypingIndicator(ctx: Context): () => void {
@@ -141,13 +143,20 @@ export function createBot(): Bot {
         }
       }
 
-      // Run agent with overall timeout
+      // Get or create session
+      const session = await sessionManager.getOrCreateSession("kettl-user");
+      console.log(`[SESSION] Using session ${session.filename} with ${session.messages.length} messages`);
+
+      // Run agent with session history and overall timeout
       console.log("[LLM] Starting agent...");
       const response = await withTimeout(
-        runAgent(userMessage, systemPrompt),
+        runAgent(userMessage, systemPrompt, session.messages),
         config.overallTimeout,
         "Response took too long"
       );
+
+      // Persist new messages to session
+      await sessionManager.appendMessages(response.newMessages);
 
       const duration = Date.now() - startTime;
       console.log(`[LLM] Completed in ${duration}ms, tools: ${response.toolsUsed.join(", ") || "none"}`);
