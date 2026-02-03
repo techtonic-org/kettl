@@ -1,11 +1,16 @@
-FROM oven/bun:1 AS base
+FROM python:3.11-slim
 WORKDIR /app
 
-# Install Python for GarminDB
-RUN apt-get update && apt-get install -y python3 python3-pip && rm -rf /var/lib/apt/lists/*
-RUN pip3 install garmindb --break-system-packages
+# Install Bun
+RUN apt-get update && apt-get install -y curl unzip && \
+    curl -fsSL https://bun.sh/install | bash && \
+    ln -s /root/.bun/bin/bun /usr/local/bin/bun && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copy package files
+# Install GarminDB
+RUN pip install --no-cache-dir garmindb
+
+# Copy package files and install JS deps
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 
@@ -13,5 +18,4 @@ RUN bun install --frozen-lockfile
 COPY src ./src
 COPY tsconfig.json ./
 
-# Run
 CMD ["bun", "run", "src/index.ts"]
