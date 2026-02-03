@@ -96,11 +96,14 @@ export function createBot(): Bot {
     try {
       // Check data freshness - scheduler handles sync, just warn if stale
       const lastSync = getLastSyncTime();
-      const syncAge = lastSync ? Date.now() - lastSync.getTime() : Infinity;
-      const syncAgeHours = syncAge / (1000 * 60 * 60);
 
-      if (syncAgeHours > 4) {
-        warnings.push(`Data is ${Math.floor(syncAgeHours)}h old, using instant API for recent data`);
+      if (!lastSync) {
+        warnings.push("SQLite data not yet synced, using instant API");
+      } else {
+        const syncAgeHours = (Date.now() - lastSync.getTime()) / (1000 * 60 * 60);
+        if (syncAgeHours > 4) {
+          warnings.push(`Data is ${Math.floor(syncAgeHours)}h old, using instant API for recent data`);
+        }
       }
 
       // Check memory availability and get prompt
