@@ -6,6 +6,7 @@ const mockChat = mock(() =>
   Promise.resolve({
     text: "Final response",
     toolCalls: [],
+    toolCallParts: [],
     finishReason: "STOP",
   })
 );
@@ -49,8 +50,14 @@ beforeEach(() => {
     Promise.resolve({
       text: "Final response",
       toolCalls: [],
+      toolCallParts: [],
       finishReason: "STOP",
     })
+  );
+
+  // Reset executeAll to default
+  mockExecuteAll.mockImplementation(() =>
+    Promise.resolve([{ name: "test_tool", result: { data: "tool result" } }])
   );
 });
 
@@ -71,12 +78,14 @@ describe("runAgent", () => {
         return Promise.resolve({
           text: null,
           toolCalls: [{ name: "test_tool", args: { input: "test" } }],
+          toolCallParts: [{ functionCall: { name: "test_tool", args: { input: "test" } } }],
           finishReason: "STOP",
         });
       }
       return Promise.resolve({
         text: "Got the result!",
         toolCalls: [],
+        toolCallParts: [],
         finishReason: "STOP",
       });
     });
@@ -100,12 +109,17 @@ describe("runAgent", () => {
             { name: "tool1", args: {} },
             { name: "tool2", args: {} },
           ],
+          toolCallParts: [
+            { functionCall: { name: "tool1", args: {} } },
+            { functionCall: { name: "tool2", args: {} } },
+          ],
           finishReason: "STOP",
         });
       }
       return Promise.resolve({
         text: "Done",
         toolCalls: [],
+        toolCallParts: [],
         finishReason: "STOP",
       });
     });
@@ -128,6 +142,7 @@ describe("runAgent", () => {
       Promise.resolve({
         text: null,
         toolCalls: [{ name: "infinite_tool", args: {} }],
+        toolCallParts: [{ functionCall: { name: "infinite_tool", args: {} } }],
         finishReason: "STOP",
       })
     );
@@ -151,12 +166,14 @@ describe("runAgent", () => {
         return Promise.resolve({
           text: null,
           toolCalls: [{ name: "failing_tool", args: {} }],
+          toolCallParts: [{ functionCall: { name: "failing_tool", args: {} } }],
           finishReason: "STOP",
         });
       }
       return Promise.resolve({
         text: "Handled the error",
         toolCalls: [],
+        toolCallParts: [],
         finishReason: "STOP",
       });
     });
@@ -199,6 +216,19 @@ describe("runAgent", () => {
 
 describe("runAgent with session history", () => {
   test("includes session history in conversation", async () => {
+    // Explicitly set mock to return no tool calls
+    mockChat.mockImplementation(() =>
+      Promise.resolve({
+        text: "Response with history",
+        toolCalls: [],
+        toolCallParts: [],
+        finishReason: "STOP",
+      })
+    );
+
+    // Clear mock calls right before our test
+    mockChat.mockClear();
+
     const sessionHistory: GeminiMessage[] = [
       { role: "user", parts: [{ text: "Previous question" }] },
       { role: "model", parts: [{ text: "Previous answer" }] },
@@ -207,12 +237,48 @@ describe("runAgent with session history", () => {
     await runAgent("New question", "System", sessionHistory);
 
     // First call should include session history
+    // Note: messages array gets mutated after chat() returns (model response is added),
+    // so we check the first 3 messages which are what was passed to the first chat() call
     const firstCall = mockChat.mock.calls[0];
     const [messages] = firstCall as [any[], any, string];
 
-    expect(messages).toHaveLength(3); // 2 history + 1 new
+    // The array now includes the final model response (added after chat returns)
+    // We verify the first 3 messages are correct
+    expect(messages.length).toBeGreaterThanOrEqual(3);
     expect(messages[0].parts[0].text).toBe("Previous question");
     expect(messages[1].parts[0].text).toBe("Previous answer");
     expect(messages[2].parts[0].text).toBe("New question");
+  });
+});
+
+describe("runAgent message tracking", () => {
+  test("returns all new messages from conversation", async () => {
+    let callCount = 0;
+    mockChat.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return Promise.resolve({
+          text: null,
+          toolCalls: [{ name: "test_tool", args: {} }],
+          toolCallParts: [{ functionCall: { name: "test_tool", args: {} } }],
+          finishReason: "STOP",
+        });
+      }
+      return Promise.resolve({
+        text: "Final answer",
+        toolCalls: [],
+        toolCallParts: [],
+        finishReason: "STOP",
+      });
+    });
+
+    const result = await runAgent("Question", "System");
+
+    // Should include: user, model (tool call), function (result), model (final)
+    expect(result.newMessages).toHaveLength(4);
+    expect(result.newMessages[0].role).toBe("user");
+    expect(result.newMessages[1].role).toBe("model");
+    expect(result.newMessages[2].role).toBe("function");
+    expect(result.newMessages[3].role).toBe("model");
   });
 });

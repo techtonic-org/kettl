@@ -7,6 +7,7 @@ const MAX_TOOL_ROUNDS = 5;
 export interface AgentResponse {
   text: string;
   toolsUsed: string[];
+  newMessages: GeminiMessage[];
 }
 
 export async function runAgent(
@@ -28,9 +29,12 @@ export async function runAgent(
     // If no tool calls, we're done
     if (response.toolCalls.length === 0) {
       console.log("[AGENT] No tool calls, returning response");
+      const finalText = response.text || "I couldn't generate a response.";
+      messages.push({ role: "model", parts: [{ text: finalText }] });
       return {
-        text: response.text || "I couldn't generate a response.",
+        text: finalText,
         toolsUsed,
+        newMessages: messages.slice(sessionHistory.length),
       };
     }
 
@@ -66,10 +70,13 @@ export async function runAgent(
 
   // Exceeded max rounds, ask for final response without tools
   const finalResponse = await chat(messages, [], systemPrompt);
+  const finalText =
+    finalResponse.text ||
+    "I used several tools but couldn't formulate a final response.";
+  messages.push({ role: "model", parts: [{ text: finalText }] });
   return {
-    text:
-      finalResponse.text ||
-      "I used several tools but couldn't formulate a final response.",
+    text: finalText,
     toolsUsed,
+    newMessages: messages.slice(sessionHistory.length),
   };
 }
