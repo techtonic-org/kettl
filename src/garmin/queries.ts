@@ -18,25 +18,6 @@ function openDb(name: string): Database | null {
   return new Database(path, { readonly: true });
 }
 
-export function getTodaysSummary(): DailySummary | null {
-  const db = openDb("garmin_summary.db");
-  if (!db) return null;
-  try {
-    const today = new Date().toISOString().split("T")[0];
-    const row = db
-      .query<DailySummary, [string]>(
-        `SELECT day as date, steps, floors, hr_min, hr_max, rhr_avg as rhr, stress_avg,
-                bb_max, bb_min, sleep_avg as sleep_score
-         FROM days_summary
-         WHERE day = ?`
-      )
-      .get(today);
-    return row || null;
-  } finally {
-    db.close();
-  }
-}
-
 export function getRecentActivities(days: number = 7): Activity[] {
   const db = openDb("garmin_activities.db");
   if (!db) return [];

@@ -16,7 +16,6 @@ mock.module("../config", () => ({
 
 // Import after mocking
 import {
-  getTodaysSummary,
   getRecentActivities,
   getActivityDetails,
   getSleepTrend,
@@ -100,38 +99,6 @@ afterEach(async () => {
   } catch {
     // ignore
   }
-});
-
-describe("getTodaysSummary", () => {
-  test("returns null when database doesn't exist", () => {
-    const result = getTodaysSummary();
-    expect(result).toBeNull();
-  });
-
-  test("returns null when no data for today", () => {
-    const db = createSummaryDb();
-    db.close();
-
-    const result = getTodaysSummary();
-    expect(result).toBeNull();
-  });
-
-  test("returns today's summary", () => {
-    const db = createSummaryDb();
-    const today = new Date().toISOString().split("T")[0];
-    db.run(
-      `INSERT INTO days_summary (day, steps, rhr_avg, stress_avg, bb_max, bb_min, sleep_avg)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [today, 10000, 55, 30, 85, 35, 82]
-    );
-    db.close();
-
-    const result = getTodaysSummary();
-    expect(result).not.toBeNull();
-    expect(result!.steps).toBe(10000);
-    expect(result!.rhr).toBe(55);
-    expect(result!.sleep_score).toBe(82);
-  });
 });
 
 describe("getRecentActivities", () => {

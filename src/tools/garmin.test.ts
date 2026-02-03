@@ -2,14 +2,6 @@ import { describe, test, expect, mock, beforeEach } from "bun:test";
 
 // Mock garmin module
 const mockSyncGarmin = mock(() => Promise.resolve({ success: true, durationMs: 1500 }));
-const mockGetTodaysSummary = mock(() => ({
-  date: "2026-02-03",
-  steps: 8000,
-  rhr: 55,
-  stress_avg: 30,
-  bb_max: 85,
-  bb_min: 35,
-}));
 const mockGetRecentActivities = mock(() => [
   { activity_id: "123", name: "Morning Run", type: "running" },
 ]);
@@ -25,7 +17,6 @@ const mockQueryGarmin = mock(() => [{ day: "2026-02-03" }]);
 
 mock.module("../garmin", () => ({
   syncGarmin: mockSyncGarmin,
-  getTodaysSummary: mockGetTodaysSummary,
   getRecentActivities: mockGetRecentActivities,
   getActivityDetails: mockGetActivityDetails,
   getSleepTrend: mockGetSleepTrend,
@@ -66,11 +57,6 @@ registry.register(
       return { synced: false, error: result.error };
     }
   }
-);
-
-registry.register(
-  { name: "get_todays_summary", description: "Today's summary", parameters: {} },
-  async () => mockGetTodaysSummary()
 );
 
 registry.register(
@@ -124,7 +110,6 @@ registry.register(
 
 beforeEach(() => {
   mockSyncGarmin.mockClear();
-  mockGetTodaysSummary.mockClear();
   mockGetRecentActivities.mockClear();
   mockGetActivityDetails.mockClear();
   mockGetSleepTrend.mockClear();
@@ -145,14 +130,6 @@ describe("sync_garmin tool", () => {
     );
     const result = await registry.execute("sync_garmin");
     expect(result).toEqual({ synced: false, error: "Connection failed" });
-  });
-});
-
-describe("get_todays_summary tool", () => {
-  test("returns today's summary", async () => {
-    const result = await registry.execute("get_todays_summary");
-    expect(result.steps).toBe(8000);
-    expect(result.rhr).toBe(55);
   });
 });
 

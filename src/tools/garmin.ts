@@ -1,7 +1,6 @@
 import { toolRegistry } from "./registry";
 import {
   syncGarmin,
-  getTodaysSummary,
   getRecentActivities,
   getActivityDetails,
   getSleepTrend,
@@ -28,22 +27,6 @@ toolRegistry.register(
     } else {
       return { synced: false, error: result.error };
     }
-  }
-);
-
-// get_todays_summary
-toolRegistry.register(
-  {
-    name: "get_todays_summary",
-    description:
-      "Get today's health summary: steps, sleep score, stress, body battery, resting HR.",
-    parameters: {
-      type: "object",
-      properties: {},
-    },
-  },
-  async () => {
-    return getTodaysSummary();
   }
 );
 
