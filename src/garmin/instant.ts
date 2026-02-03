@@ -6,6 +6,8 @@ import { config } from "../config";
 
 let client: GarminConnect | null = null;
 let initialized = false;
+let lastAuthFailure: Date | null = null;
+const AUTH_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes cooldown after auth failure
 
 const TOKEN_DIR = join(homedir(), ".garmin-tokens");
 
@@ -37,9 +39,44 @@ export interface InstantSleep {
   score: number | null;
 }
 
+function isInAuthCooldown(): boolean {
+  if (!lastAuthFailure) return false;
+  const elapsed = Date.now() - lastAuthFailure.getTime();
+  return elapsed < AUTH_COOLDOWN_MS;
+}
+
+async function doLogin(): Promise<void> {
+  if (!client) {
+    throw new Error("Client not initialized");
+  }
+
+  // Check cooldown before attempting login
+  if (isInAuthCooldown()) {
+    const remainingMins = Math.ceil((AUTH_COOLDOWN_MS - (Date.now() - lastAuthFailure!.getTime())) / 60000);
+    throw new Error(`Garmin auth in cooldown, retry in ${remainingMins} minutes`);
+  }
+
+  try {
+    await client.login();
+    client.exportTokenToFile(TOKEN_DIR);
+    lastAuthFailure = null;
+    console.log("[Instant] Garmin Connect logged in and tokens saved");
+  } catch (loginError) {
+    lastAuthFailure = new Date();
+    console.error("[Instant] Login failed, cooldown started:", loginError);
+    throw loginError;
+  }
+}
+
 export async function initInstantClient(): Promise<void> {
   if (initialized && client) {
     return;
+  }
+
+  // Check cooldown before attempting init
+  if (isInAuthCooldown()) {
+    const remainingMins = Math.ceil((AUTH_COOLDOWN_MS - (Date.now() - lastAuthFailure!.getTime())) / 60000);
+    throw new Error(`Garmin auth in cooldown, retry in ${remainingMins} minutes`);
   }
 
   const credentials = {
@@ -62,17 +99,36 @@ export async function initInstantClient(): Promise<void> {
   } catch (tokenError) {
     // Tokens invalid or missing, need fresh login
     console.log("[Instant] Saved tokens invalid or missing, logging in fresh...");
-    try {
-      await client.login();
-      client.exportTokenToFile(TOKEN_DIR);
-      console.log("[Instant] Garmin Connect client initialized and tokens saved");
-    } catch (loginError) {
-      console.error("[Instant] Login failed:", loginError);
-      throw loginError;
-    }
+    await doLogin();
   }
 
   initialized = true;
+}
+
+function is403Error(error: unknown): boolean {
+  if (error instanceof Error) {
+    return error.message.includes("(403)") || error.message.includes("Forbidden");
+  }
+  return false;
+}
+
+async function withReauth<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (is403Error(error) && client && !isInAuthCooldown()) {
+      console.log("[Instant] Got 403, attempting re-authentication...");
+      try {
+        await doLogin();
+        // Retry the operation
+        return await fn();
+      } catch (reAuthError) {
+        console.error("[Instant] Re-authentication failed:", reAuthError);
+        throw error; // Throw original error
+      }
+    }
+    throw error;
+  }
 }
 
 export async function getCurrentVitals(): Promise<InstantVitals> {
@@ -85,9 +141,9 @@ export async function getCurrentVitals(): Promise<InstantVitals> {
 
   const today = new Date();
 
-  try {
+  return withReauth(async () => {
     // Get steps
-    const steps = await client.getSteps(today);
+    const steps = await client!.getSteps(today);
 
     // Get resting HR and body battery from sleep data
     let restingHr: number | null = null;
@@ -95,7 +151,7 @@ export async function getCurrentVitals(): Promise<InstantVitals> {
     let bodyBatteryLow: number | null = null;
 
     try {
-      const sleepData = await client.getSleepData(today);
+      const sleepData = await client!.getSleepData(today);
       restingHr = sleepData?.restingHeartRate ?? null;
 
       // Extract body battery high/low from sleep data if available
@@ -115,10 +171,10 @@ export async function getCurrentVitals(): Promise<InstantVitals> {
       bodyBatteryHigh,
       bodyBatteryLow,
     };
-  } catch (error) {
+  }).catch((error) => {
     console.error(`[Instant] Failed to get vitals for ${today.toISOString().split("T")[0]}:`, error);
     throw error;
-  }
+  });
 }
 
 export async function getLatestActivities(
@@ -131,8 +187,8 @@ export async function getLatestActivities(
     throw new Error("Failed to initialize Garmin client");
   }
 
-  try {
-    const activities = await client.getActivities(0, limit);
+  return withReauth(async () => {
+    const activities = await client!.getActivities(0, limit);
 
     return activities.map((a: any) => ({
       activityId: a.activityId,
@@ -145,10 +201,10 @@ export async function getLatestActivities(
       maxHR: a.maxHR,
       calories: a.calories,
     }));
-  } catch (error) {
+  }).catch((error) => {
     console.error(`[Instant] Failed to get activities (limit: ${limit}):`, error);
     throw error;
-  }
+  });
 }
 
 export async function getTodaysSleep(): Promise<InstantSleep | null> {
@@ -161,8 +217,8 @@ export async function getTodaysSleep(): Promise<InstantSleep | null> {
 
   const today = new Date();
 
-  try {
-    const sleep = await client.getSleepData(today);
+  return withReauth(async () => {
+    const sleep = await client!.getSleepData(today);
     const dto = sleep?.dailySleepDTO;
 
     if (!dto) {
@@ -176,10 +232,10 @@ export async function getTodaysSleep(): Promise<InstantSleep | null> {
       remSleep: dto.remSleepSeconds ?? 0,
       score: dto.sleepScores?.overall?.value ?? null,
     };
-  } catch (error) {
+  }).catch((error) => {
     console.error(`[Instant] Failed to get sleep data for ${today.toISOString().split("T")[0]}:`, error);
     return null;
-  }
+  });
 }
 
 export function isInstantClientInitialized(): boolean {
