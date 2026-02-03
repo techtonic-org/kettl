@@ -1,4 +1,15 @@
 services:
+  kettl:
+    build: .
+    env_file:
+      - .env
+    volumes:
+      - ~/.garmindb:/root/.garmindb
+      - ~/.GarminDb:/root/.GarminDb
+    depends_on:
+      - mem0
+    restart: unless-stopped
+
   qdrant:
     image: qdrant/qdrant:latest
     ports:
@@ -14,7 +25,6 @@ services:
     environment:
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
-      # Mem0 needs an LLM for extraction - we'll configure Gemini
       - LLM_PROVIDER=google
       - GOOGLE_API_KEY=${GEMINI_API_KEY}
       - EMBEDDER_PROVIDER=google
