@@ -74,3 +74,30 @@ describe("appendToSession", () => {
     expect(JSON.parse(lines[1])).toEqual(message);
   });
 });
+
+describe("loadSession", () => {
+  test("loads all messages from session file", async () => {
+    const { createSession, appendToSession, loadSession, getSessionFileName } = await import("./store");
+
+    const startTime = new Date("2026-02-03T14:30:45Z");
+    await createSession(startTime, "test-user");
+
+    const filename = getSessionFileName(startTime);
+    await appendToSession(filename, { role: "user", parts: [{ text: "Hello" }] });
+    await appendToSession(filename, { role: "model", parts: [{ text: "Hi there!" }] });
+
+    const session = await loadSession(filename);
+
+    expect(session.meta.startedAt).toBe("2026-02-03T14:30:45.000Z");
+    expect(session.messages).toHaveLength(2);
+    expect(session.messages[0].role).toBe("user");
+    expect(session.messages[1].role).toBe("model");
+  });
+
+  test("returns null for missing session", async () => {
+    const { loadSession } = await import("./store");
+
+    const session = await loadSession("nonexistent.jsonl");
+    expect(session).toBeNull();
+  });
+});

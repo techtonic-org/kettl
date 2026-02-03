@@ -48,3 +48,30 @@ export async function appendToSession(
   const filePath = getSessionFilePath(filename);
   await appendFile(filePath, JSON.stringify(entry) + "\n");
 }
+
+export interface LoadedSession {
+  meta: SessionMeta;
+  messages: GeminiMessage[];
+  filename: string;
+}
+
+export async function loadSession(filename: string): Promise<LoadedSession | null> {
+  const filePath = getSessionFilePath(filename);
+  const file = Bun.file(filePath);
+
+  if (!(await file.exists())) {
+    return null;
+  }
+
+  const content = await file.text();
+  const lines = content.trim().split("\n").filter(Boolean);
+
+  if (lines.length === 0) {
+    return null;
+  }
+
+  const meta = JSON.parse(lines[0]) as SessionMeta;
+  const messages = lines.slice(1).map((line) => JSON.parse(line) as GeminiMessage);
+
+  return { meta, messages, filename };
+}
