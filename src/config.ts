@@ -56,6 +56,7 @@ export const config = {
     getEnvOrDefault("SUMMARIES_PATH", "./data/summaries")
   ),
   chatsPath: expandPath(getEnvOrDefault("CHATS_PATH", "./data/chats")),
+  sessionsPath: expandPath(getEnvOrDefault("SESSIONS_PATH", "./data/sessions")),
 
   // Timezone for scheduling (defaults to system timezone)
   timezone: getEnvOrDefault("TZ", "UTC"),
