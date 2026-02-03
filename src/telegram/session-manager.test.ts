@@ -56,4 +56,44 @@ describe("SessionManager", () => {
     // Should be a new session (different timestamp)
     expect(session.messages).toEqual([]);
   });
+
+  test("hasActiveSession returns true when session exists", async () => {
+    const manager = new SessionManager();
+
+    expect(manager.hasActiveSession()).toBe(false);
+    await manager.getOrCreateSession("user-123");
+    expect(manager.hasActiveSession()).toBe(true);
+  });
+
+  test("hasActiveSession returns false after clear", async () => {
+    const manager = new SessionManager();
+
+    await manager.getOrCreateSession("user-123");
+    expect(manager.hasActiveSession()).toBe(true);
+    manager.clear();
+    expect(manager.hasActiveSession()).toBe(false);
+  });
+
+  test("appendMessages adds messages to session", async () => {
+    const manager = new SessionManager();
+    await manager.getOrCreateSession("user-123");
+
+    await manager.appendMessages([
+      { role: "user", parts: [{ text: "Hello" }] },
+      { role: "model", parts: [{ text: "Hi there!" }] },
+    ]);
+
+    const session = await manager.getOrCreateSession("user-123");
+    expect(session.messages).toHaveLength(2);
+    expect(session.messages[0].role).toBe("user");
+    expect(session.messages[1].role).toBe("model");
+  });
+
+  test("appendMessages throws when no active session", async () => {
+    const manager = new SessionManager();
+
+    expect(
+      manager.appendMessages([{ role: "user", parts: [{ text: "Hello" }] }])
+    ).rejects.toThrow("No active session");
+  });
 });
