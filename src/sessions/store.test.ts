@@ -101,3 +101,69 @@ describe("loadSession", () => {
     expect(session).toBeNull();
   });
 });
+
+describe("getActiveSession", () => {
+  test("returns most recent session if within expiry window", async () => {
+    const { createSession, getActiveSession, getSessionFileName } = await import("./store");
+
+    // Create session 1 hour ago (within 4 hour window)
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    await createSession(oneHourAgo, "test-user");
+
+    const session = await getActiveSession(4);
+
+    expect(session).not.toBeNull();
+    expect(session!.filename).toBe(getSessionFileName(oneHourAgo));
+  });
+
+  test("returns null if session is expired", async () => {
+    const { createSession, getActiveSession } = await import("./store");
+
+    // Create session 5 hours ago (outside 4 hour window)
+    const fiveHoursAgo = new Date(Date.now() - 5 * 60 * 60 * 1000);
+    await createSession(fiveHoursAgo, "test-user");
+
+    const session = await getActiveSession(4);
+
+    expect(session).toBeNull();
+  });
+
+  test("returns null if no sessions exist", async () => {
+    const { getActiveSession } = await import("./store");
+
+    const session = await getActiveSession(4);
+    expect(session).toBeNull();
+  });
+});
+
+describe("getRecentSessions", () => {
+  test("returns sessions sorted by most recent first", async () => {
+    const { createSession, getRecentSessions } = await import("./store");
+
+    const time1 = new Date("2026-02-03T10:00:00Z");
+    const time2 = new Date("2026-02-03T12:00:00Z");
+    const time3 = new Date("2026-02-03T14:00:00Z");
+
+    await createSession(time1, "user");
+    await createSession(time2, "user");
+    await createSession(time3, "user");
+
+    const sessions = await getRecentSessions(5);
+
+    expect(sessions).toHaveLength(3);
+    expect(sessions[0].meta.startedAt).toBe(time3.toISOString());
+    expect(sessions[1].meta.startedAt).toBe(time2.toISOString());
+    expect(sessions[2].meta.startedAt).toBe(time1.toISOString());
+  });
+
+  test("limits number of sessions returned", async () => {
+    const { createSession, getRecentSessions } = await import("./store");
+
+    for (let i = 0; i < 10; i++) {
+      await createSession(new Date(Date.now() - i * 60000), "user");
+    }
+
+    const sessions = await getRecentSessions(3);
+    expect(sessions).toHaveLength(3);
+  });
+});

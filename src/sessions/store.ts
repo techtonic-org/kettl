@@ -75,3 +75,47 @@ export async function loadSession(filename: string): Promise<LoadedSession | nul
 
   return { meta, messages, filename };
 }
+
+export async function getActiveSession(
+  expiryHours: number
+): Promise<LoadedSession | null> {
+  const sessions = await getRecentSessions(1);
+
+  if (sessions.length === 0) {
+    return null;
+  }
+
+  const latest = sessions[0];
+  const sessionAge = Date.now() - new Date(latest.meta.startedAt).getTime();
+  const expiryMs = expiryHours * 60 * 60 * 1000;
+
+  if (sessionAge > expiryMs) {
+    return null;
+  }
+
+  return latest;
+}
+
+export async function getRecentSessions(limit: number): Promise<LoadedSession[]> {
+  try {
+    const files = await readdir(config.sessionsPath);
+    const jsonlFiles = files.filter((f) => f.endsWith(".jsonl")).sort().reverse();
+
+    const sessions: LoadedSession[] = [];
+
+    for (const filename of jsonlFiles.slice(0, limit)) {
+      const session = await loadSession(filename);
+      if (session) {
+        sessions.push(session);
+      }
+    }
+
+    return sessions;
+  } catch (err) {
+    // Directory doesn't exist yet
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return [];
+    }
+    throw err;
+  }
+}
