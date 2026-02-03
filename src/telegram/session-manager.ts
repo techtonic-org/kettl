@@ -56,6 +56,10 @@ export class SessionManager {
     this.currentSession = null;
   }
 
+  setSession(session: LoadedSession): void {
+    this.currentSession = session;
+  }
+
   hasActiveSession(): boolean {
     return this.currentSession !== null;
   }

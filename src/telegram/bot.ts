@@ -8,6 +8,8 @@ import type { PromptContext } from "../prompts";
 import { withTimeout, TimeoutError } from "../utils/timeout";
 import { appendChat } from "../chats/store";
 import { SessionManager } from "./session-manager";
+import { getRecentSessions } from "../sessions";
+import type { GeminiMessage } from "../agent/gemini";
 
 // Ensure tools are registered
 import "../tools";
@@ -46,6 +48,30 @@ function getMessageTimeLocal(date: Date): string {
   });
 }
 
+function formatSessionTime(isoString: string): string {
+  const date = new Date(isoString);
+  return date.toLocaleString("en-GB", {
+    timeZone: config.timezone,
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getLastUserMessage(messages: GeminiMessage[]): string | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg.role === "user") {
+      const textPart = msg.parts.find((p) => "text" in p);
+      if (textPart && "text" in textPart) {
+        return textPart.text;
+      }
+    }
+  }
+  return null;
+}
+
 export function createBot(): Bot {
   if (bot) return bot;
 
@@ -61,6 +87,45 @@ export function createBot(): Bot {
   bot.command("clear", async (ctx) => {
     sessionManager.clear();
     await ctx.reply("Session cleared. Starting fresh!");
+  });
+
+  bot.command("continue", async (ctx) => {
+    const args = ctx.message.text.split(" ").slice(1);
+    const sessions = await getRecentSessions(5);
+
+    if (sessions.length === 0) {
+      await ctx.reply("No previous sessions found.");
+      return;
+    }
+
+    // If number provided, resume that session
+    if (args[0]) {
+      const index = parseInt(args[0], 10) - 1;
+      if (isNaN(index) || index < 0 || index >= sessions.length) {
+        await ctx.reply(`Invalid session number. Use 1-${sessions.length}`);
+        return;
+      }
+
+      const session = sessions[index];
+      sessionManager.setSession(session);
+      await ctx.reply(`Resumed session from ${formatSessionTime(session.meta.startedAt)} (${session.messages.length} messages)`);
+      return;
+    }
+
+    // List recent sessions
+    const lines = sessions.map((s, i) => {
+      const time = formatSessionTime(s.meta.startedAt);
+      const lastMsg = getLastUserMessage(s.messages);
+      const preview = lastMsg ? `"${lastMsg.slice(0, 30)}${lastMsg.length > 30 ? "..." : ""}"` : "(empty)";
+      return `${i + 1}. ${time} - ${s.messages.length} msgs - ${preview}`;
+    });
+
+    await ctx.reply(
+      "*Recent sessions:*\n\n" +
+      lines.join("\n") +
+      "\n\nUse `/continue N` to resume a session.",
+      { parse_mode: "Markdown" }
+    );
   });
 
   bot.on("message:text", async (ctx) => {
