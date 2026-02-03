@@ -1,0 +1,26 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+
+  mem0:
+    image: mem0ai/mem0:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      # Mem0 needs an LLM for extraction - we'll configure Gemini
+      - LLM_PROVIDER=google
+      - GOOGLE_API_KEY=${GEMINI_API_KEY}
+      - EMBEDDER_PROVIDER=google
+    depends_on:
+      - qdrant
+    restart: unless-stopped
+
+volumes:
+  qdrant_data:
