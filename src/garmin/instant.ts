@@ -1,8 +1,13 @@
 import { GarminConnect } from "garmin-connect";
+import { existsSync, mkdirSync } from "fs";
+import { homedir } from "os";
+import { join } from "path";
 import { config } from "../config";
 
 let client: GarminConnect | null = null;
 let initialized = false;
+
+const TOKEN_DIR = join(homedir(), ".garmin-tokens");
 
 export interface InstantVitals {
   steps: number;
@@ -42,9 +47,32 @@ export async function initInstantClient(): Promise<void> {
     password: config.garminPassword(),
   };
   client = new GarminConnect(credentials);
-  await client.login();
+
+  // Ensure token directory exists
+  if (!existsSync(TOKEN_DIR)) {
+    mkdirSync(TOKEN_DIR, { recursive: true });
+  }
+
+  // Try to load existing tokens first
+  try {
+    client.loadTokenByFile(TOKEN_DIR);
+    // Verify tokens work by making a simple request
+    await client.getSteps(new Date());
+    console.log("[Instant] Garmin Connect client initialized from saved tokens");
+  } catch (tokenError) {
+    // Tokens invalid or missing, need fresh login
+    console.log("[Instant] Saved tokens invalid or missing, logging in fresh...");
+    try {
+      await client.login();
+      client.exportTokenToFile(TOKEN_DIR);
+      console.log("[Instant] Garmin Connect client initialized and tokens saved");
+    } catch (loginError) {
+      console.error("[Instant] Login failed:", loginError);
+      throw loginError;
+    }
+  }
+
   initialized = true;
-  console.log("[Instant] Garmin Connect client initialized");
 }
 
 export async function getCurrentVitals(): Promise<InstantVitals> {

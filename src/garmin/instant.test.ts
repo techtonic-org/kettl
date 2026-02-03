@@ -1,5 +1,11 @@
 import { describe, test, expect, mock, beforeEach } from "bun:test";
 
+// Mock fs
+mock.module("fs", () => ({
+  existsSync: () => true,
+  mkdirSync: () => {},
+}));
+
 // Mock config
 mock.module("../config", () => ({
   config: {
@@ -32,6 +38,8 @@ const mockGetSleepData = mock(() =>
     ],
   })
 );
+const mockLoadTokenByFile = mock(() => {});
+const mockExportTokenToFile = mock(() => {});
 
 mock.module("garmin-connect", () => ({
   GarminConnect: class {
@@ -39,6 +47,8 @@ mock.module("garmin-connect", () => ({
     getSteps = mockGetSteps;
     getActivities = mockGetActivities;
     getSleepData = mockGetSleepData;
+    loadTokenByFile = mockLoadTokenByFile;
+    exportTokenToFile = mockExportTokenToFile;
   },
 }));
 
@@ -52,11 +62,15 @@ describe("Instant Garmin Client", () => {
     mockGetSteps.mockClear();
     mockGetActivities.mockClear();
     mockGetSleepData.mockClear();
+    mockLoadTokenByFile.mockClear();
+    mockExportTokenToFile.mockClear();
   });
 
-  test("initInstantClient authenticates on first call", async () => {
+  test("initInstantClient uses saved tokens when available", async () => {
     await initInstantClient();
-    expect(mockLogin).toHaveBeenCalledTimes(1);
+    // Should try to use saved tokens first, not login
+    expect(mockLoadTokenByFile).toHaveBeenCalled();
+    expect(mockLogin).not.toHaveBeenCalled();
   });
 
   test("getCurrentVitals returns formatted vitals", async () => {
