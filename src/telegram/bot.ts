@@ -1,7 +1,7 @@
 import { Bot } from "grammy";
 import { config } from "../config";
 import { runAgent } from "../agent";
-import { syncGarmin, getLastSyncTime } from "../garmin";
+import { syncGarmin, getLastSyncTime, isBackgroundSyncRunning } from "../garmin";
 import { isMemoryAvailable, getUserProfile } from "../memory";
 import { MAIN_PROMPT, BOOTSTRAP_PROMPT } from "../prompts";
 import { withTimeout, TimeoutError } from "../utils/timeout";
@@ -42,15 +42,24 @@ export function createBot(): Bot {
       // Send typing indicator
       await ctx.replyWithChatAction("typing");
 
-      // Sync Garmin data (don't block on failure)
-      const syncResult = await syncGarmin().catch((e) => {
-        console.warn("Garmin sync failed:", e);
-        return { success: false, error: String(e) };
-      });
-
-      if (!syncResult.success) {
+      // Sync Garmin data (skip if background sync is running)
+      if (isBackgroundSyncRunning()) {
         const lastSync = getLastSyncTime();
-        warnings.push(`Garmin sync failed, using data from ${formatTimeSince(lastSync)}`);
+        if (!lastSync) {
+          warnings.push("Initial Garmin sync in progress, data may be incomplete");
+        } else {
+          warnings.push(`Garmin sync in progress, using data from ${formatTimeSince(lastSync)}`);
+        }
+      } else {
+        const syncResult = await syncGarmin().catch((e) => {
+          console.warn("Garmin sync failed:", e);
+          return { success: false, error: String(e) };
+        });
+
+        if (!syncResult.success) {
+          const lastSync = getLastSyncTime();
+          warnings.push(`Garmin sync failed, using data from ${formatTimeSince(lastSync)}`);
+        }
       }
 
       // Check memory availability and get prompt

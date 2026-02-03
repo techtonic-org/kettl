@@ -7,7 +7,10 @@ export interface SyncResult {
   success: boolean;
   durationMs: number;
   error?: string;
+  firstSync?: boolean;
 }
+
+let backgroundSyncRunning = false;
 
 // Generate GarminConnectConfig.json from env vars if it doesn't exist
 async function ensureGarminConfig(): Promise<void> {
@@ -108,4 +111,42 @@ export function getLastSyncTime(): Date | null {
   } catch {
     return null;
   }
+}
+
+// Background sync for initial startup (no timeout, runs async)
+export async function syncGarminBackground(): Promise<void> {
+  if (backgroundSyncRunning) {
+    console.log("Background sync already running, skipping");
+    return;
+  }
+
+  backgroundSyncRunning = true;
+  const start = Date.now();
+
+  try {
+    await ensureGarminConfig();
+
+    const proc = spawn({
+      cmd: ["garmindb_cli.py", "--all", "--download", "--import", "--analyze"],
+      stdout: "inherit",
+      stderr: "inherit",
+    });
+
+    const exitCode = await proc.exited;
+    const durationMs = Date.now() - start;
+
+    if (exitCode === 0) {
+      console.log(`Background Garmin sync completed in ${Math.round(durationMs / 1000)}s`);
+    } else {
+      console.error(`Background Garmin sync failed with exit code ${exitCode}`);
+    }
+  } catch (error) {
+    console.error("Background Garmin sync error:", error);
+  } finally {
+    backgroundSyncRunning = false;
+  }
+}
+
+export function isBackgroundSyncRunning(): boolean {
+  return backgroundSyncRunning;
 }
