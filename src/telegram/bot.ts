@@ -239,7 +239,14 @@ export function createBot(): Bot {
 
       // Stop typing and send response
       stopTyping();
-      await ctx.reply(replyText, { parse_mode: "Markdown" });
+      try {
+        await ctx.reply(replyText, { parse_mode: "Markdown" });
+      } catch (markdownError) {
+        // Markdown parsing failed (unclosed entities, special chars, etc.)
+        // Retry without parse_mode
+        console.log("[MSG] Markdown parse failed, retrying without formatting");
+        await ctx.reply(replyText);
+      }
 
       console.log(`[MSG] Response sent (${duration}ms total)`);
 
