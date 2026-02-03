@@ -6,6 +6,8 @@ services:
     volumes:
       - ~/.GarminDb:/root/.GarminDb
       - ~/HealthData:/root/HealthData
+      - ./data/summaries:/app/data/summaries
+      - ./data/chats:/app/data/chats
     depends_on:
       - mem0
     restart: unless-stopped
