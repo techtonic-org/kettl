@@ -19,15 +19,15 @@ services:
     restart: unless-stopped
 
   mem0:
-    image: mem0ai/mem0:latest
+    build:
+      context: .
+      dockerfile: mem0.Dockerfile
     ports:
       - "8080:8080"
     environment:
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
-      - LLM_PROVIDER=google
-      - GOOGLE_API_KEY=${GEMINI_API_KEY}
-      - EMBEDDER_PROVIDER=google
+      - OPENAI_API_KEY=${GEMINI_API_KEY}
     depends_on:
       - qdrant
     restart: unless-stopped
