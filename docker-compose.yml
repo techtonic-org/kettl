@@ -3,6 +3,8 @@ services:
     build: .
     env_file:
       - .env
+    environment:
+      - TZ=Europe/Budapest
     volumes:
       - ~/.GarminDb:/root/.GarminDb
       - ~/HealthData:/root/HealthData
