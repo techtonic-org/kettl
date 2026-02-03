@@ -53,9 +53,9 @@ export async function runAgent(
       parts: response.toolCallParts,
     });
 
-    // Add tool results to history
+    // Add tool results to history (role must be "function" for functionResponse parts)
     messages.push({
-      role: "user",
+      role: "function",
       parts: results.map((r) =>
         createToolResultPart(r.name, r.error || r.result)
       ),

@@ -24,7 +24,7 @@ export interface GeminiResponse {
 }
 
 export interface GeminiMessage {
-  role: "user" | "model";
+  role: "user" | "model" | "function";
   parts: Part[];
 }
 
