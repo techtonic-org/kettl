@@ -2,26 +2,63 @@ import { config } from "../config";
 import type { Memory, MemoryCategory, MemorySearchResult } from "../types";
 
 const USER_ID = "kettl-user"; // Single user, hardcoded
+const MAX_RETRIES = 3;
+const INITIAL_BACKOFF_MS = 1000;
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryable(status: number): boolean {
+  return status === 429 || (status >= 500 && status < 600);
+}
 
 async function mem0Fetch(
   path: string,
   options?: RequestInit
 ): Promise<Response> {
   const url = `${config.mem0Url}${path}`;
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-  });
+  let lastError: Error | null = null;
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Mem0 error (${response.status}): ${text}`);
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...options?.headers,
+        },
+      });
+
+      if (!response.ok) {
+        if (isRetryable(response.status) && attempt < MAX_RETRIES) {
+          const backoff = INITIAL_BACKOFF_MS * Math.pow(2, attempt);
+          console.log(`[MEM] ${response.status} error, retrying in ${backoff}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+          await sleep(backoff);
+          continue;
+        }
+        const text = await response.text();
+        throw new Error(`Mem0 error (${response.status}): ${text}`);
+      }
+
+      return response;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Only retry on network errors, not on our thrown errors
+      if (lastError.message.startsWith("Mem0 error")) {
+        throw lastError;
+      }
+
+      if (attempt < MAX_RETRIES) {
+        const backoff = INITIAL_BACKOFF_MS * Math.pow(2, attempt);
+        console.log(`[MEM] Network error, retrying in ${backoff}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+        await sleep(backoff);
+      }
+    }
   }
 
-  return response;
+  throw lastError || new Error("Mem0 fetch failed after retries");
 }
 
 export async function searchMemories(

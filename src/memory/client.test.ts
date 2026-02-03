@@ -123,12 +123,29 @@ describe("searchMemories", () => {
     expect(results).toEqual([]);
   });
 
-  test("throws on API error", async () => {
+  test("throws on API error (non-retryable)", async () => {
     mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response("Server Error", { status: 500 }))
+      Promise.resolve(new Response("Bad Request", { status: 400 }))
     );
 
-    await expect(searchMemories("test")).rejects.toThrow("Mem0 error (500)");
+    await expect(searchMemories("test")).rejects.toThrow("Mem0 error (400)");
+  });
+
+  test("retries on 429 then succeeds", async () => {
+    let calls = 0;
+    mockFetch.mockImplementation(() => {
+      calls++;
+      if (calls === 1) {
+        return Promise.resolve(new Response("Rate limited", { status: 429 }));
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ results: [] }), { status: 200 })
+      );
+    });
+
+    const results = await searchMemories("test");
+    expect(results).toEqual([]);
+    expect(calls).toBe(2);
   });
 });
 
