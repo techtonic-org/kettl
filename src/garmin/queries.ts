@@ -47,7 +47,7 @@ export function getRecentActivities(days: number = 7): Activity[] {
 
     return db
       .query<Activity, [string]>(
-        `SELECT activity_id, name, type, start_time, elapsed_time,
+        `SELECT activity_id, name, sport as type, start_time, elapsed_time,
                 distance, avg_hr, max_hr, avg_speed, calories
          FROM activities
          WHERE date(start_time) >= ?
@@ -65,7 +65,7 @@ export function getActivityDetails(activityId: string): Activity | null {
   try {
     return db
       .query<Activity, [string]>(
-        `SELECT activity_id, name, type, start_time, elapsed_time,
+        `SELECT activity_id, name, sport as type, start_time, elapsed_time,
                 distance, avg_hr, max_hr, avg_speed, calories
          FROM activities
          WHERE activity_id = ?`
@@ -159,7 +159,7 @@ export function getSummaryForDate(dateStr: string): DailySummary | null {
     const row = db
       .query<DailySummary, [string]>(
         `SELECT day as date, steps, floors, hr_min, hr_max, rhr_avg as rhr, stress_avg,
-                bb_max, bb_min
+                bb_max, bb_min, sleep_avg as sleep_score
          FROM days_summary
          WHERE day = ?`
       )

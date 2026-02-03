@@ -124,11 +124,9 @@ export async function syncGarmin(): Promise<SyncResult> {
 // Get timestamp of last sync (based on db modification time)
 export function getLastSyncTime(): Date | null {
   try {
-    const stat = Bun.spawnSync({
-      cmd: ["stat", "-c", "%Y", `${config.garminDbPath}/garmin.db`],
-    });
-    const timestamp = parseInt(stat.stdout.toString().trim());
-    return isNaN(timestamp) ? null : new Date(timestamp * 1000);
+    const file = Bun.file(`${config.garminDbPath}/garmin.db`);
+    const stat = file.statSync();
+    return stat ? new Date(stat.mtime) : null;
   } catch {
     return null;
   }
