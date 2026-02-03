@@ -68,6 +68,7 @@ export function buildMainPrompt(context: PromptContext): string {
 **Instant API:** Real-time, always fresh
 - Use for: anything that happened since last sync, current state
 - Tools: get_current_vitals, get_latest_activities, get_todays_sleep_instant
+- **Important:** get_current_vitals returns steps/HR/stress/body battery only - NOT activities. For runs, workouts, or any exercises, you MUST also call get_latest_activities. When checking on user's day, call BOTH.
 
 **Daily Summaries:** Structured archive of each day
 - Use for: "what happened on X date", reviewing past days
