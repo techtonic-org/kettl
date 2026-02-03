@@ -55,20 +55,40 @@ export async function getCurrentVitals(): Promise<InstantVitals> {
     throw new Error("Failed to initialize Garmin client");
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date();
 
   try {
-    const summary = await client.getUserSummary(today);
+    // Get steps
+    const steps = await client.getSteps(today);
+
+    // Get resting HR and body battery from sleep data
+    let restingHr: number | null = null;
+    let bodyBatteryHigh: number | null = null;
+    let bodyBatteryLow: number | null = null;
+
+    try {
+      const sleepData = await client.getSleepData(today);
+      restingHr = sleepData?.restingHeartRate ?? null;
+
+      // Extract body battery high/low from sleep data if available
+      if (sleepData?.sleepBodyBattery?.length) {
+        const values = sleepData.sleepBodyBattery.map((b) => b.value);
+        bodyBatteryHigh = Math.max(...values);
+        bodyBatteryLow = Math.min(...values);
+      }
+    } catch {
+      // Sleep data not available, continue without it
+    }
 
     return {
-      steps: summary.totalSteps ?? 0,
-      restingHr: summary.restingHeartRate ?? null,
-      stressLevel: summary.maxStressLevel ?? null,
-      bodyBatteryHigh: summary.bodyBatteryHighestValue ?? null,
-      bodyBatteryLow: summary.bodyBatteryLowestValue ?? null,
+      steps: steps ?? 0,
+      restingHr,
+      stressLevel: null, // Not easily available from current API
+      bodyBatteryHigh,
+      bodyBatteryLow,
     };
   } catch (error) {
-    console.error(`[Instant] Failed to get vitals for ${today}:`, error);
+    console.error(`[Instant] Failed to get vitals for ${today.toISOString().split("T")[0]}:`, error);
     throw error;
   }
 }
@@ -111,10 +131,10 @@ export async function getTodaysSleep(): Promise<InstantSleep | null> {
     throw new Error("Failed to initialize Garmin client");
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date();
 
   try {
-    const sleep = await client.getSleep(today);
+    const sleep = await client.getSleepData(today);
     const dto = sleep?.dailySleepDTO;
 
     if (!dto) {
@@ -129,7 +149,7 @@ export async function getTodaysSleep(): Promise<InstantSleep | null> {
       score: dto.sleepScores?.overall?.value ?? null,
     };
   } catch (error) {
-    console.error(`[Instant] Failed to get sleep data for ${today}:`, error);
+    console.error(`[Instant] Failed to get sleep data for ${today.toISOString().split("T")[0]}:`, error);
     return null;
   }
 }

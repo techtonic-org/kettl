@@ -19,6 +19,7 @@ function getClient(): GoogleGenerativeAI {
 export interface GeminiResponse {
   text: string | null;
   toolCalls: ToolCall[];
+  toolCallParts: Part[]; // Original parts with thought_signature preserved
   finishReason: string;
 }
 
@@ -79,6 +80,7 @@ export async function chat(
   const response = result.response;
 
   const toolCalls: ToolCall[] = [];
+  const toolCallParts: Part[] = [];
   let text: string | null = null;
 
   for (const candidate of response.candidates || []) {
@@ -91,6 +93,8 @@ export async function chat(
           name: part.functionCall.name,
           args: (part.functionCall.args as Record<string, unknown>) || {},
         });
+        // Preserve the original part with thought_signature for Gemini 3
+        toolCallParts.push(part);
       }
     }
   }
@@ -98,6 +102,7 @@ export async function chat(
   return {
     text,
     toolCalls,
+    toolCallParts,
     finishReason: response.candidates?.[0]?.finishReason || "UNKNOWN",
   };
 }

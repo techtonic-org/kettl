@@ -10,21 +10,13 @@ mock.module("../config", () => ({
 
 // Mock garmin-connect before importing instant
 const mockLogin = mock(() => Promise.resolve());
-const mockGetUserSummary = mock(() =>
-  Promise.resolve({
-    totalSteps: 8000,
-    restingHeartRate: 55,
-    maxStressLevel: 45,
-    bodyBatteryHighestValue: 80,
-    bodyBatteryLowestValue: 30,
-  })
-);
+const mockGetSteps = mock(() => Promise.resolve(8000));
 const mockGetActivities = mock(() =>
   Promise.resolve([
     { activityId: 123, activityName: "Morning Run", startTimeLocal: "2026-02-03" },
   ])
 );
-const mockGetSleep = mock(() =>
+const mockGetSleepData = mock(() =>
   Promise.resolve({
     dailySleepDTO: {
       sleepTimeSeconds: 25200,
@@ -33,15 +25,20 @@ const mockGetSleep = mock(() =>
       remSleepSeconds: 4500,
       sleepScores: { overall: { value: 82 } },
     },
+    restingHeartRate: 55,
+    sleepBodyBattery: [
+      { value: 80, startGMT: 1000 },
+      { value: 30, startGMT: 2000 },
+    ],
   })
 );
 
 mock.module("garmin-connect", () => ({
   GarminConnect: class {
     login = mockLogin;
-    getUserSummary = mockGetUserSummary;
+    getSteps = mockGetSteps;
     getActivities = mockGetActivities;
-    getSleep = mockGetSleep;
+    getSleepData = mockGetSleepData;
   },
 }));
 
@@ -52,9 +49,9 @@ const { initInstantClient, getCurrentVitals, getLatestActivities, getTodaysSleep
 describe("Instant Garmin Client", () => {
   beforeEach(() => {
     mockLogin.mockClear();
-    mockGetUserSummary.mockClear();
+    mockGetSteps.mockClear();
     mockGetActivities.mockClear();
-    mockGetSleep.mockClear();
+    mockGetSleepData.mockClear();
   });
 
   test("initInstantClient authenticates on first call", async () => {
@@ -67,7 +64,7 @@ describe("Instant Garmin Client", () => {
     expect(vitals).toEqual({
       steps: 8000,
       restingHr: 55,
-      stressLevel: 45,
+      stressLevel: null, // Not available from current API
       bodyBatteryHigh: 80,
       bodyBatteryLow: 30,
     });

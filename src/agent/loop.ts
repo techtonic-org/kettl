@@ -47,12 +47,10 @@ export async function runAgent(
       }
     }
 
-    // Add model response to history
+    // Add model response to history (preserve original parts with thought_signature)
     messages.push({
       role: "model",
-      parts: response.toolCalls.map((tc) => ({
-        functionCall: { name: tc.name, args: tc.args },
-      })),
+      parts: response.toolCallParts,
     });
 
     // Add tool results to history
