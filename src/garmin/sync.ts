@@ -34,6 +34,13 @@ async function ensureGarminConfig(): Promise<void> {
   // Create config directory
   await Bun.spawn({ cmd: ["mkdir", "-p", configDir] }).exited;
 
+  // Get optional start dates (default to 6 months ago)
+  const defaultStartDate = new Date();
+  defaultStartDate.setMonth(defaultStartDate.getMonth() - 6);
+  const defaultDateStr = defaultStartDate.toISOString().split("T")[0];
+
+  const startDate = process.env.GARMIN_START_DATE || defaultDateStr;
+
   // Write config file
   const garminConfig = {
     credentials: {
@@ -41,8 +48,8 @@ async function ensureGarminConfig(): Promise<void> {
       password: password,
     },
     data: {
-      weight_start_date: "2020-01-01",
-      sleep_start_date: "2020-01-01",
+      weight_start_date: startDate,
+      sleep_start_date: startDate,
     },
     copy: {
       mount_dir: "",
