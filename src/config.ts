@@ -43,4 +43,20 @@ export const config = {
   garminSyncTimeout: 30_000,
   geminiTimeout: 60_000,
   overallTimeout: 90_000,
+
+  // Sync scheduling
+  garminSyncIntervalHours: parseInt(
+    getEnvOrDefault("GARMIN_SYNC_INTERVAL_HOURS", "4"),
+    10
+  ),
+
+  // Daily summaries
+  summaryHour: parseInt(getEnvOrDefault("SUMMARY_HOUR", "0"), 10),
+  summariesPath: expandPath(
+    getEnvOrDefault("SUMMARIES_PATH", "./data/summaries")
+  ),
+  chatsPath: expandPath(getEnvOrDefault("CHATS_PATH", "./data/chats")),
+
+  // Timezone for scheduling (defaults to system timezone)
+  timezone: getEnvOrDefault("TZ", "UTC"),
 } as const;
