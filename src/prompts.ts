@@ -36,3 +36,35 @@ Tool usage:
 Memory categories: user_profile, goals, food_impacts, training_patterns, weekly_summaries
 
 Don't over-explain. Don't be sycophantic. Be a good coach.`;
+
+export interface PromptContext {
+  lastSyncTime: Date;
+  lastSyncAgo: string;
+  messageTime: Date;
+  messageTimeLocal: string;
+}
+
+export function buildMainPrompt(context: PromptContext): string {
+  return `${MAIN_PROMPT}
+
+## Current Context
+
+**Message received:** ${context.messageTimeLocal} (${context.messageTime.toISOString()})
+**SQLite last synced:** ${context.lastSyncAgo}
+
+## Data Freshness
+
+**SQLite Data (GarminDB):** Last synced ${context.lastSyncAgo} (${context.lastSyncTime.toISOString()})
+- Use for: trends, historical analysis, aggregates, detailed activity breakdowns
+- Tools: get_todays_summary, get_recent_activities, get_sleep_trend, get_weight_trend, get_body_battery_trend, query_garmin
+
+**Instant API:** Real-time, always fresh
+- Use for: anything that happened since last sync, current state
+- Tools: get_current_vitals, get_latest_activities, get_todays_sleep_instant
+
+**Daily Summaries:** Structured archive of each day
+- Use for: "what happened on X date", reviewing past days
+- Tool: get_daily_summary
+
+**Rule of thumb:** If the user asks about "now" or "today" and sync was >1 hour ago, prefer instant API tools.`;
+}
