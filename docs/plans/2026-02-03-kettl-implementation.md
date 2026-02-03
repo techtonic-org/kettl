@@ -131,10 +131,9 @@ mkdir -p ~/.GarminDb
 
 ---
 
-### Task 4: Configure GarminDB Credentials
+### Task 4: Configure Environment Variables
 
 **Files:**
-- Create: `~/.GarminDb/GarminConnectConfig.json`
 - Create: `.env` (local, not committed)
 - Create: `.env.example`
 - Update: `.gitignore`
@@ -166,65 +165,30 @@ GEMINI_API_KEY=your-gemini-api-key
 # Mem0 (when running with Docker)
 MEM0_URL=http://localhost:8080
 
-# GarminDB path
-GARMINDB_PATH=~/.garmindb/garmin.db
+# GarminDB path (where databases are stored)
+GARMINDB_PATH=~/.GarminDb/HealthData
 ```
 
-**Step 3: Create .env with actual credentials**
-
-Create `.env` (user must fill in real values):
-```
-GARMIN_EMAIL=
-GARMIN_PASSWORD=
-TELEGRAM_BOT_TOKEN=
-GEMINI_API_KEY=
-MEM0_URL=http://localhost:8080
-GARMINDB_PATH=~/.garmindb/garmin.db
-```
-
-**Step 4: Prompt user to fill credentials**
-
-The user needs to:
-1. Fill in `GARMIN_EMAIL` and `GARMIN_PASSWORD` in `.env`
-2. Create GarminDB config at `~/.GarminDb/GarminConnectConfig.json`:
-```json
-{
-  "credentials": {
-    "user": "YOUR_GARMIN_EMAIL",
-    "password": "YOUR_GARMIN_PASSWORD"
-  },
-  "data": {
-    "weight_start_date": "2020-01-01",
-    "sleep_start_date": "2020-01-01"
-  },
-  "copy": {
-    "mount_dir": ""
-  },
-  "enabled_stats": {
-    "monitoring": true,
-    "sleep": true,
-    "rhr": true,
-    "weight": true,
-    "activities": true
-  }
-}
-```
-
-**Step 5: Commit gitignore and example**
+**Step 3: Commit gitignore and example**
 
 Run:
 ```bash
 cd /home/claude/ttd/kettl && git add .gitignore .env.example && git commit -m "feat: add environment configuration"
 ```
 
+**Note:** GarminConnectConfig.json is NOT manually created. The app generates it automatically from GARMIN_EMAIL and GARMIN_PASSWORD env vars (see Task 9).
+
 ---
 
-### Task 5: Run Initial Garmin Sync
+### Task 5: Initial Garmin Sync (Automatic)
 
-**Files:**
-- None (data sync)
+**SKIPPED** - Sync happens automatically on first app run. The sync wrapper (Task 9) generates the GarminDB config from env vars and runs the sync. No manual setup required.
 
-**Step 1: Run full GarminDB sync**
+---
+
+### Task 5 (Original): Run Initial Garmin Sync
+
+**DEPRECATED** - This task is now automatic. Keeping for reference.
 
 Run:
 ```bash
@@ -614,6 +578,8 @@ cd /home/claude/ttd/kettl && git add src/garmin && git commit -m "feat: add Garm
 Create `src/garmin/sync.ts`:
 ```typescript
 import { spawn } from "bun";
+import { join } from "path";
+import { homedir } from "os";
 import { config } from "../config";
 
 export interface SyncResult {
@@ -622,10 +588,60 @@ export interface SyncResult {
   error?: string;
 }
 
+// Generate GarminConnectConfig.json from env vars if it doesn't exist
+async function ensureGarminConfig(): Promise<void> {
+  const configDir = join(homedir(), ".GarminDb");
+  const configPath = join(configDir, "GarminConnectConfig.json");
+
+  // Check if config already exists
+  const file = Bun.file(configPath);
+  if (await file.exists()) {
+    return;
+  }
+
+  // Get credentials from env
+  const email = process.env.GARMIN_EMAIL;
+  const password = process.env.GARMIN_PASSWORD;
+
+  if (!email || !password) {
+    throw new Error("GARMIN_EMAIL and GARMIN_PASSWORD must be set");
+  }
+
+  // Create config directory
+  await Bun.spawn({ cmd: ["mkdir", "-p", configDir] }).exited;
+
+  // Write config file
+  const garminConfig = {
+    credentials: {
+      user: email,
+      password: password,
+    },
+    data: {
+      weight_start_date: "2020-01-01",
+      sleep_start_date: "2020-01-01",
+    },
+    copy: {
+      mount_dir: "",
+    },
+    enabled_stats: {
+      monitoring: true,
+      sleep: true,
+      rhr: true,
+      weight: true,
+      activities: true,
+    },
+  };
+
+  await Bun.write(configPath, JSON.stringify(garminConfig, null, 2));
+}
+
 export async function syncGarmin(): Promise<SyncResult> {
   const start = Date.now();
 
   try {
+    // Ensure config exists before syncing
+    await ensureGarminConfig();
+
     const proc = spawn({
       cmd: ["garmindb_cli.py", "--all", "--download", "--import", "--analyze"],
       stdout: "pipe",
