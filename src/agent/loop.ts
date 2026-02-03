@@ -20,10 +20,12 @@ export async function runAgent(
   const toolsUsed: string[] = [];
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    console.log(`[AGENT] Round ${round + 1}/${MAX_TOOL_ROUNDS}`);
     const response = await chat(messages, tools, systemPrompt);
 
     // If no tool calls, we're done
     if (response.toolCalls.length === 0) {
+      console.log("[AGENT] No tool calls, returning response");
       return {
         text: response.text || "I couldn't generate a response.",
         toolsUsed,
@@ -31,8 +33,19 @@ export async function runAgent(
     }
 
     // Execute tool calls
+    console.log(`[AGENT] Executing tools: ${response.toolCalls.map((t) => t.name).join(", ")}`);
     const results: ToolResult[] = await toolRegistry.executeAll(response.toolCalls);
     toolsUsed.push(...results.map((r) => r.name));
+
+    // Log tool results
+    for (const r of results) {
+      if (r.error) {
+        console.log(`[TOOL] ${r.name}: ERROR - ${r.error}`);
+      } else {
+        const preview = JSON.stringify(r.result).slice(0, 100);
+        console.log(`[TOOL] ${r.name}: ${preview}${preview.length >= 100 ? "..." : ""}`);
+      }
+    }
 
     // Add model response to history
     messages.push({

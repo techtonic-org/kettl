@@ -21,9 +21,9 @@ function expandPath(path: string): string {
 }
 
 export const config = {
-  // Garmin
+  // Garmin - garmindb stores DBs at ~/HealthData/DBs/ by default
   garminDbPath: expandPath(
-    getEnvOrDefault("GARMINDB_PATH", "~/.GarminDb/HealthData")
+    getEnvOrDefault("GARMINDB_PATH", "~/HealthData/DBs")
   ),
 
   // Garmin credentials (for config generation)

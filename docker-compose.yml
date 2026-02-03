@@ -4,8 +4,8 @@ services:
     env_file:
       - .env
     volumes:
-      - ~/.garmindb:/root/.garmindb
       - ~/.GarminDb:/root/.GarminDb
+      - ~/HealthData:/root/HealthData
     depends_on:
       - mem0
     restart: unless-stopped

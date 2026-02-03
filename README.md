@@ -35,12 +35,45 @@ cp .env.example .env
 |----------|-------------|
 | `GARMIN_EMAIL` | Your Garmin Connect email |
 | `GARMIN_PASSWORD` | Your Garmin Connect password |
+| `GARMIN_START_DATE` | How far back to sync metrics (default: 6 months ago) |
+| `GARMIN_ACTIVITY_COUNT` | Number of activities to download (default: 200) |
 | `TELEGRAM_BOT_TOKEN` | From BotFather |
 | `GEMINI_API_KEY` | From Google AI Studio |
 | `MEM0_URL` | Memory service URL (default: `http://mem0:8080`) |
 | `GARMINDB_PATH` | Where Garmin databases live (default: `~/.GarminDb/HealthData`) |
 
 The app auto-generates the GarminDB config file from your email/password on first run. No manual setup needed.
+
+### Garmin sync configuration
+
+The Garmin sync uses [GarminDB](https://github.com/tcgoetz/GarminDb) under the hood, which has two different sync modes:
+
+**Date-based metrics** (`GARMIN_START_DATE`):
+- Controls: sleep, heart rate, weight, body battery, stress, steps, monitoring data
+- Format: `YYYY-MM-DD` (e.g., `2024-06-01`)
+- Default: 6 months ago from first startup
+- Syncs ALL data from that date to today
+
+**Activity count** (`GARMIN_ACTIVITY_COUNT`):
+- Controls: activities (runs, walks, rides, workouts, etc.)
+- This is NOT date-based - it downloads the **last N activities regardless of date**
+- Default: 200
+- If you have 500 activities and set this to 200, you only get the most recent 200
+
+**Why the difference?** This is a GarminDB limitation, not a Kettl design choice. The Garmin Connect API exposes metrics by date range but activities by count.
+
+**Recommendations:**
+- For a new setup with 6 months of history: `GARMIN_START_DATE=2024-08-01` and `GARMIN_ACTIVITY_COUNT=200`
+- For years of history: Set `GARMIN_ACTIVITY_COUNT` high enough to capture all activities (e.g., `1000` for ~3 years of regular training)
+- First sync downloads everything and can take a while (1-2 min per month of data)
+- Subsequent syncs only fetch new data and are fast (~10-30 seconds)
+
+**Changing these after first run:**
+If you change `GARMIN_START_DATE` or `GARMIN_ACTIVITY_COUNT`, you need to delete the generated config for it to take effect:
+```bash
+rm ~/.GarminDb/GarminConnectConfig.json
+docker compose restart kettl
+```
 
 ## Run
 

@@ -39,13 +39,28 @@ export async function searchMemories(
     body.metadata = { category };
   }
 
-  const response = await mem0Fetch("/v1/memories/search", {
+  const response = await mem0Fetch("/v1/memories/search/", {
     method: "POST",
     body: JSON.stringify(body),
   });
 
   const data = await response.json();
-  return (data.results || []).map((r: any) => ({
+
+  // Handle various response formats: array, {results: array}, or {results: {results: array}}
+  let results = data;
+  if (!Array.isArray(results)) {
+    results = data.results;
+    if (!Array.isArray(results) && results?.results) {
+      results = results.results; // Handle double-nesting
+    }
+  }
+
+  if (!Array.isArray(results)) {
+    console.warn("[MEM] Unexpected search response format:", JSON.stringify(data).slice(0, 200));
+    return [];
+  }
+
+  return results.map((r: any) => ({
     memory: {
       id: r.id,
       content: r.memory,
@@ -61,7 +76,7 @@ export async function saveInsight(
   content: string,
   category: MemoryCategory
 ): Promise<Memory> {
-  const response = await mem0Fetch("/v1/memories", {
+  const response = await mem0Fetch("/v1/memories/", {
     method: "POST",
     body: JSON.stringify({
       messages: [{ role: "user", content }],
