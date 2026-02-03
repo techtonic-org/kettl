@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { buildMainPrompt, PromptContext } from "./prompts";
+import { buildMainPrompt, PromptContext, MAIN_PROMPT } from "./prompts";
 
 describe("Dynamic Prompts", () => {
   test("buildMainPrompt includes sync time", () => {
@@ -42,5 +42,11 @@ describe("Dynamic Prompts", () => {
     const prompt = buildMainPrompt(context);
 
     expect(prompt).toContain("prefer instant API");
+  });
+
+  test("MAIN_PROMPT includes conservative tool guidance", () => {
+    expect(MAIN_PROMPT).toContain("Be conservative with tools");
+    expect(MAIN_PROMPT).toContain("Don't retry failed tools");
+    expect(MAIN_PROMPT).toContain("Only use save_insight for genuinely useful");
   });
 });
