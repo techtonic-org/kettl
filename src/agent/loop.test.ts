@@ -281,4 +281,52 @@ describe("runAgent message tracking", () => {
     expect(result.newMessages[2].role).toBe("function");
     expect(result.newMessages[3].role).toBe("model");
   });
+
+  test("returns newMessages when max rounds exceeded", async () => {
+    // Always return tool calls to hit the limit
+    mockChat.mockImplementation(() =>
+      Promise.resolve({
+        text: null,
+        toolCalls: [{ name: "loop_tool", args: {} }],
+        toolCallParts: [{ functionCall: { name: "loop_tool", args: {} } }],
+        finishReason: "STOP",
+      })
+    );
+
+    mockExecuteAll.mockImplementation(() =>
+      Promise.resolve([{ name: "loop_tool", result: "continue" }])
+    );
+
+    const result = await runAgent("Loop forever", "System");
+
+    // Should include: user, plus 5 rounds of (model + function), plus final model
+    // 1 + 5*2 + 1 = 12 messages
+    expect(result.newMessages).toHaveLength(12);
+    expect(result.newMessages[0].role).toBe("user");
+    expect(result.newMessages[11].role).toBe("model");
+  });
+
+  test("newMessages excludes session history", async () => {
+    mockChat.mockImplementation(() =>
+      Promise.resolve({
+        text: "Response",
+        toolCalls: [],
+        toolCallParts: [],
+        finishReason: "STOP",
+      })
+    );
+
+    const sessionHistory: GeminiMessage[] = [
+      { role: "user", parts: [{ text: "Previous question" }] },
+      { role: "model", parts: [{ text: "Previous answer" }] },
+    ];
+
+    const result = await runAgent("New question", "System", sessionHistory);
+
+    // Only new messages: user + model
+    expect(result.newMessages).toHaveLength(2);
+    expect(result.newMessages[0].role).toBe("user");
+    expect(result.newMessages[0].parts[0]).toEqual({ text: "New question" });
+    expect(result.newMessages[1].role).toBe("model");
+  });
 });
