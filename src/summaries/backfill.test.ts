@@ -3,17 +3,10 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-let testDir: string;
+// Set up testDir before mocking
+const testDir = await mkdtemp(join(tmpdir(), "backfill-test-"));
 
-beforeEach(async () => {
-  testDir = await mkdtemp(join(tmpdir(), "backfill-test-"));
-});
-
-afterEach(async () => {
-  await rm(testDir, { recursive: true, force: true });
-});
-
-// Mock config
+// Mock config at top level
 mock.module("../config", () => ({
   config: {
     summariesPath: testDir,
@@ -32,6 +25,21 @@ mock.module("./generator", () => ({
 }));
 
 const { getMissingDates, runBackfill } = await import("./backfill");
+
+afterEach(async () => {
+  // Clean up test files between tests
+  for (const date of ["2026-02-01", "2026-02-02", "2026-02-03"]) {
+    const file = join(testDir, `${date}.md`);
+    if (await Bun.file(file).exists()) {
+      await rm(file, { force: true });
+    }
+  }
+});
+
+// Final cleanup
+process.on("beforeExit", async () => {
+  await rm(testDir, { recursive: true, force: true });
+});
 
 describe("Summary Backfill", () => {
   beforeEach(() => {

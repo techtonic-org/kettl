@@ -6,7 +6,7 @@
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
     "cli": "bun run src/cli.ts",
-    "test": "bun test"
+    "test": "for f in src/**/*.test.ts src/*.test.ts; do bun test \"$f\" || exit 1; done"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",

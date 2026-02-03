@@ -52,7 +52,7 @@ export async function chat(
 ): Promise<GeminiResponse> {
   const genAI = getClient();
   const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: "gemini-3-flash-preview",
     systemInstruction: systemPrompt,
     tools: tools.length > 0
       ? [

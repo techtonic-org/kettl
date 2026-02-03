@@ -1,5 +1,13 @@
 import { describe, test, expect, mock, beforeEach } from "bun:test";
 
+// Mock config
+mock.module("../config", () => ({
+  config: {
+    garminEmail: () => "test@example.com",
+    garminPassword: () => "testpassword",
+  },
+}));
+
 // Mock garmin-connect before importing instant
 const mockLogin = mock(() => Promise.resolve());
 const mockGetUserSummary = mock(() =>
