@@ -149,3 +149,59 @@ export function queryGarmin(sql: string, dbName: string = "garmin.db"): unknown[
     db.close();
   }
 }
+
+// Date-specific queries for summary generation
+
+export function getSummaryForDate(dateStr: string): DailySummary | null {
+  const db = openDb("garmin_summary.db");
+  if (!db) return null;
+  try {
+    const row = db
+      .query<DailySummary, [string]>(
+        `SELECT day as date, steps, floors, hr_min, hr_max, rhr_avg as rhr, stress_avg,
+                bb_max, bb_min
+         FROM days_summary
+         WHERE day = ?`
+      )
+      .get(dateStr);
+    return row || null;
+  } finally {
+    db.close();
+  }
+}
+
+export function getActivitiesForDate(dateStr: string): Activity[] {
+  const db = openDb("garmin_activities.db");
+  if (!db) return [];
+  try {
+    return db
+      .query<Activity, [string]>(
+        `SELECT activity_id, name, sport as type, start_time, elapsed_time,
+                distance, avg_hr, max_hr, avg_speed, calories
+         FROM activities
+         WHERE date(start_time) = ?
+         ORDER BY start_time`
+      )
+      .all(dateStr);
+  } finally {
+    db.close();
+  }
+}
+
+export function getSleepForDate(dateStr: string): SleepSession | null {
+  const db = openDb("garmin.db");
+  if (!db) return null;
+  try {
+    const row = db
+      .query<SleepSession, [string]>(
+        `SELECT day as date, start as start_time, end as end_time, total_sleep,
+                deep_sleep, light_sleep, rem_sleep, awake, score
+         FROM sleep
+         WHERE day = ?`
+      )
+      .get(dateStr);
+    return row || null;
+  } finally {
+    db.close();
+  }
+}

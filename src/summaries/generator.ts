@@ -2,9 +2,9 @@ import { mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { config } from "../config";
 import {
-  getTodaysSummary,
-  getRecentActivities,
-  getSleepTrend,
+  getSummaryForDate,
+  getActivitiesForDate,
+  getSleepForDate,
 } from "../garmin/queries";
 import { getChatsForDate, type ChatEntry } from "../chats/store";
 import { chat } from "../agent/gemini";
@@ -61,11 +61,11 @@ export async function generateDailySummary(
 
   console.log(`[Summary] Generating summary for ${dateStr}`);
 
-  // Gather data
+  // Gather data for the specific date
   const [vitals, activities, sleep, chats] = await Promise.all([
-    getTodaysSummary(),
-    getRecentActivities(1),
-    getSleepTrend(1),
+    getSummaryForDate(dateStr),
+    getActivitiesForDate(dateStr),
+    getSleepForDate(dateStr),
     getChatsForDate(dateStr),
   ]);
 
@@ -107,23 +107,22 @@ interface DailySummaryData {
   stress_avg?: number | null;
   bb_max?: number | null;
   bb_min?: number | null;
-  sleep_score?: number | null;
 }
 
 interface ActivityData {
   name?: string;
   type?: string;
   distance?: number | null;
-  elapsed_time?: number | null;
+  elapsed_time?: string | null;  // SQLite returns time as string "HH:MM:SS.mmm"
   avg_hr?: number | null;
   max_hr?: number | null;
 }
 
 interface SleepData {
-  total_sleep?: number | null;
-  deep_sleep?: number | null;
-  light_sleep?: number | null;
-  rem_sleep?: number | null;
+  total_sleep?: string | null;  // SQLite returns time as string "HH:MM:SS.mmm"
+  deep_sleep?: string | null;
+  light_sleep?: string | null;
+  rem_sleep?: string | null;
   score?: number | null;
 }
 
@@ -131,7 +130,7 @@ function buildDataContext(
   dateStr: string,
   vitals: DailySummaryData | null,
   activities: ActivityData[],
-  sleep: SleepData[],
+  sleep: SleepData | null,
   chats: ChatEntry[]
 ): string {
   const sections: string[] = [`Date: ${dateStr}`, ""];
@@ -145,7 +144,6 @@ function buildDataContext(
     sections.push(
       `- Body Battery: ${vitals.bb_min ?? "N/A"} → ${vitals.bb_max ?? "N/A"}`
     );
-    sections.push(`- Sleep Score: ${vitals.sleep_score ?? "N/A"}`);
     sections.push("");
   } else {
     sections.push("VITALS DATA: No data available");
@@ -157,8 +155,8 @@ function buildDataContext(
   if (activities.length > 0) {
     for (const act of activities) {
       sections.push(
-        `- ${act.name} (${act.type}): ${formatDistance(act.distance ?? null)}, ` +
-          `${formatDuration(act.elapsed_time ?? null)}, avg HR ${act.avg_hr ?? "N/A"}, ` +
+        `- ${act.name} (${act.type}): ${formatDistanceKm(act.distance)}, ` +
+          `${formatTimeString(act.elapsed_time)}, avg HR ${act.avg_hr ?? "N/A"}, ` +
           `max HR ${act.max_hr ?? "N/A"}`
       );
     }
@@ -169,13 +167,12 @@ function buildDataContext(
 
   // Sleep
   sections.push("SLEEP (previous night):");
-  if (sleep.length > 0) {
-    const s = sleep[0];
-    sections.push(`- Total: ${formatDuration(s.total_sleep ?? null)}`);
-    sections.push(`- Deep: ${formatDuration(s.deep_sleep ?? null)}`);
-    sections.push(`- Light: ${formatDuration(s.light_sleep ?? null)}`);
-    sections.push(`- REM: ${formatDuration(s.rem_sleep ?? null)}`);
-    sections.push(`- Score: ${s.score ?? "N/A"}`);
+  if (sleep) {
+    sections.push(`- Total: ${formatTimeString(sleep.total_sleep)}`);
+    sections.push(`- Deep: ${formatTimeString(sleep.deep_sleep)}`);
+    sections.push(`- Light: ${formatTimeString(sleep.light_sleep)}`);
+    sections.push(`- REM: ${formatTimeString(sleep.rem_sleep)}`);
+    sections.push(`- Score: ${sleep.score ?? "N/A"}`);
   } else {
     sections.push("No sleep data available");
   }
@@ -197,15 +194,19 @@ function buildDataContext(
   return sections.join("\n");
 }
 
-function formatDistance(meters: number | null): string {
-  if (!meters) return "N/A";
-  return `${(meters / 1000).toFixed(2)}km`;
+function formatDistanceKm(km: number | null | undefined): string {
+  if (km == null || km === 0) return "N/A";
+  return `${km.toFixed(2)}km`;
 }
 
-function formatDuration(seconds: number | null): string {
-  if (!seconds) return "N/A";
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
+// Format time strings like "01:01:42.743000" or "05:55:00.000000"
+function formatTimeString(timeStr: string | null | undefined): string {
+  if (!timeStr) return "N/A";
+  // Parse HH:MM:SS from the string
+  const match = timeStr.match(/^(\d+):(\d+):(\d+)/);
+  if (!match) return timeStr;
+  const hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
   if (hours > 0) {
     return `${hours}h ${minutes}m`;
   }
