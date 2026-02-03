@@ -14,19 +14,20 @@ config = {
         "config": {
             "host": os.getenv("QDRANT_HOST", "localhost"),
             "port": int(os.getenv("QDRANT_PORT", 6333)),
+            "embedding_model_dims": 768,  # Gemini text-embedding-004 dimension
         }
     },
     "llm": {
-        "provider": "litellm",
+        "provider": "gemini",
         "config": {
-            "model": "gemini/gemini-2.0-flash",
+            "model": "gemini-2.0-flash",
             "api_key": os.getenv("OPENAI_API_KEY"),  # Actually Gemini key
         }
     },
     "embedder": {
-        "provider": "litellm",
+        "provider": "gemini",
         "config": {
-            "model": "gemini/text-embedding-004",
+            "model": "models/text-embedding-004",
             "api_key": os.getenv("OPENAI_API_KEY"),
         }
     }
