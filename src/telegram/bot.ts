@@ -85,7 +85,8 @@ export function createBot(): Bot {
   });
 
   bot.command("clear", async (ctx) => {
-    sessionManager.clear();
+    const userId = ctx.from?.id?.toString() ?? "unknown";
+    await sessionManager.clear(userId);
     await ctx.reply("Session cleared. Starting fresh!");
   });
 

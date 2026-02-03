@@ -52,8 +52,19 @@ export class SessionManager {
     }
   }
 
-  clear(): void {
-    this.currentSession = null;
+  async clear(userId: string): Promise<void> {
+    // Create a new empty session (so getActiveSession won't load the old one)
+    const startTime = new Date();
+    const filename = await createSession(startTime, userId);
+    this.currentSession = {
+      meta: {
+        _meta: true,
+        startedAt: startTime.toISOString(),
+        userId,
+      },
+      messages: [],
+      filename,
+    };
   }
 
   setSession(session: LoadedSession): void {
