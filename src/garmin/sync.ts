@@ -1,6 +1,7 @@
 import { spawn } from "bun";
 import { join } from "path";
 import { homedir } from "os";
+import { statSync } from "fs";
 import { config } from "../config";
 
 export interface SyncResult {
@@ -124,9 +125,8 @@ export async function syncGarmin(): Promise<SyncResult> {
 // Get timestamp of last sync (based on db modification time)
 export function getLastSyncTime(): Date | null {
   try {
-    const file = Bun.file(`${config.garminDbPath}/garmin.db`);
-    const stat = file.statSync();
-    return stat ? new Date(stat.mtime) : null;
+    const stat = statSync(`${config.garminDbPath}/garmin.db`);
+    return new Date(stat.mtime);
   } catch {
     return null;
   }
