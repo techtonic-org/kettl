@@ -4,3 +4,4 @@ export { toolRegistry } from "./registry";
 import "./garmin";
 import "./instant-garmin";
 import "./memory";
+import "./summaries";
