@@ -3,6 +3,7 @@ import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
 import { mkdtemp, rm, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { GeminiMessage } from "../agent/gemini";
 
 let testDir: string;
 
@@ -33,5 +34,43 @@ describe("Session Store", () => {
     const date = new Date("2026-02-03T14:30:45.123Z");
     const name = getSessionFileName(date);
     expect(name).toBe("2026-02-03T14-30-45.jsonl");
+  });
+});
+
+describe("createSession", () => {
+  test("creates session file with metadata", async () => {
+    const { createSession, getSessionFileName } = await import("./store");
+
+    const startTime = new Date("2026-02-03T14:30:45Z");
+    await createSession(startTime, "test-user");
+
+    const expectedFile = join(testDir, getSessionFileName(startTime));
+    const content = await Bun.file(expectedFile).text();
+    const meta = JSON.parse(content.trim());
+
+    expect(meta._meta).toBe(true);
+    expect(meta.startedAt).toBe("2026-02-03T14:30:45.000Z");
+    expect(meta.userId).toBe("test-user");
+  });
+});
+
+describe("appendToSession", () => {
+  test("appends message to session file", async () => {
+    const { createSession, appendToSession, getSessionFileName } = await import("./store");
+
+    const startTime = new Date("2026-02-03T14:30:45Z");
+    await createSession(startTime, "test-user");
+
+    const message: GeminiMessage = {
+      role: "user",
+      parts: [{ text: "Hello" }],
+    };
+    await appendToSession(getSessionFileName(startTime), message);
+
+    const expectedFile = join(testDir, getSessionFileName(startTime));
+    const lines = (await Bun.file(expectedFile).text()).trim().split("\n");
+
+    expect(lines).toHaveLength(2);
+    expect(JSON.parse(lines[1])).toEqual(message);
   });
 });

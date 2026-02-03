@@ -17,3 +17,34 @@ export function getSessionFileName(date: Date): string {
   // Format: YYYY-MM-DDTHH-mm-ss.jsonl (replace colons for filesystem safety)
   return iso.slice(0, 19).replace(/:/g, "-") + ".jsonl";
 }
+
+function getSessionFilePath(filename: string): string {
+  return join(config.sessionsPath, filename);
+}
+
+export async function createSession(
+  startTime: Date,
+  userId: string
+): Promise<string> {
+  const filename = getSessionFileName(startTime);
+  const filePath = getSessionFilePath(filename);
+
+  await mkdir(config.sessionsPath, { recursive: true });
+
+  const meta: SessionMeta = {
+    _meta: true,
+    startedAt: startTime.toISOString(),
+    userId,
+  };
+
+  await appendFile(filePath, JSON.stringify(meta) + "\n");
+  return filename;
+}
+
+export async function appendToSession(
+  filename: string,
+  entry: GeminiMessage
+): Promise<void> {
+  const filePath = getSessionFilePath(filename);
+  await appendFile(filePath, JSON.stringify(entry) + "\n");
+}
