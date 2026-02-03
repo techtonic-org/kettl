@@ -144,6 +144,10 @@ function buildDataContext(
     sections.push(
       `- Body Battery: ${vitals.bb_min ?? "N/A"} → ${vitals.bb_max ?? "N/A"}`
     );
+    // Include sleep summary in vitals
+    if (sleep) {
+      sections.push(`- Sleep: ${formatTimeString(sleep.total_sleep)} (score: ${sleep.score ?? "N/A"})`);
+    }
     sections.push("");
   } else {
     sections.push("VITALS DATA: No data available");
