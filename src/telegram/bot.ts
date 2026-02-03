@@ -1,10 +1,12 @@
 import { Bot, type Context } from "grammy";
 import { config } from "../config";
 import { runAgent } from "../agent";
-import { syncGarmin, getLastSyncTime, isBackgroundSyncRunning, getSyncProgress } from "../garmin";
+import { getLastSyncTime, getSyncProgress } from "../garmin";
 import { isMemoryAvailable, getUserProfile } from "../memory";
-import { MAIN_PROMPT, BOOTSTRAP_PROMPT } from "../prompts";
+import { buildMainPrompt, BOOTSTRAP_PROMPT } from "../prompts";
+import type { PromptContext } from "../prompts";
 import { withTimeout, TimeoutError } from "../utils/timeout";
+import { appendChat } from "../chats/store";
 
 // Ensure tools are registered
 import "../tools";
@@ -34,6 +36,14 @@ function formatTimeSince(date: Date | null): string {
   return `${hours} hours ago`;
 }
 
+function getMessageTimeLocal(date: Date): string {
+  return date.toLocaleTimeString("en-GB", {
+    timeZone: config.timezone,
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function createBot(): Bot {
   if (bot) return bot;
 
@@ -50,6 +60,7 @@ export function createBot(): Bot {
     const userMessage = ctx.message.text;
     const warnings: string[] = [];
     const startTime = Date.now();
+    const messageTime = new Date();
 
     console.log(`[MSG] Received: "${userMessage.slice(0, 50)}${userMessage.length > 50 ? "..." : ""}"`);
 
@@ -83,36 +94,31 @@ export function createBot(): Bot {
     const stopTyping = startTypingIndicator(ctx);
 
     try {
-      // Sync latest Garmin activity (fast incremental sync)
-      if (isBackgroundSyncRunning()) {
-        console.log("[SYNC] Background sync in progress, skipping");
-        const lastSync = getLastSyncTime();
-        if (!lastSync) {
-          warnings.push("Initial Garmin sync in progress, data may be incomplete");
-        }
-      } else {
-        console.log("[SYNC] Syncing latest activity...");
-        const syncResult = await syncGarmin().catch((e) => {
-          console.warn("[SYNC] Failed:", e);
-          return { success: false, error: String(e) };
-        });
+      // Check data freshness - scheduler handles sync, just warn if stale
+      const lastSync = getLastSyncTime();
+      const syncAge = lastSync ? Date.now() - lastSync.getTime() : Infinity;
+      const syncAgeHours = syncAge / (1000 * 60 * 60);
 
-        if (syncResult.success) {
-          console.log(`[SYNC] Completed in ${syncResult.durationMs}ms`);
-        } else {
-          const lastSync = getLastSyncTime();
-          warnings.push(`Garmin sync failed, using data from ${formatTimeSince(lastSync)}`);
-        }
+      if (syncAgeHours > 4) {
+        warnings.push(`Data is ${Math.floor(syncAgeHours)}h old, using instant API for recent data`);
       }
 
       // Check memory availability and get prompt
       console.log("[MEM] Checking memory service...");
-      let systemPrompt = MAIN_PROMPT;
+      let systemPrompt: string;
       const memoryAvailable = await isMemoryAvailable();
 
       if (!memoryAvailable) {
         console.log("[MEM] Memory unavailable");
         warnings.push("Memory unavailable, I may repeat myself");
+        // Use dynamic prompt with context even without memory
+        const context: PromptContext = {
+          lastSyncTime: lastSync ?? new Date(0),
+          lastSyncAgo: lastSync ? formatTimeSince(lastSync) : "never",
+          messageTime,
+          messageTimeLocal: getMessageTimeLocal(messageTime),
+        };
+        systemPrompt = buildMainPrompt(context);
       } else {
         console.log("[MEM] Memory available, fetching profile...");
         const profile = await getUserProfile();
@@ -121,6 +127,14 @@ export function createBot(): Bot {
           systemPrompt = BOOTSTRAP_PROMPT;
         } else {
           console.log(`[MEM] Profile loaded (${profile.length} memories)`);
+          // Build dynamic prompt with sync time context
+          const context: PromptContext = {
+            lastSyncTime: lastSync ?? new Date(0),
+            lastSyncAgo: lastSync ? formatTimeSince(lastSync) : "never",
+            messageTime,
+            messageTimeLocal: getMessageTimeLocal(messageTime),
+          };
+          systemPrompt = buildMainPrompt(context);
         }
       }
 
@@ -146,6 +160,13 @@ export function createBot(): Bot {
       await ctx.reply(replyText, { parse_mode: "Markdown" });
 
       console.log(`[MSG] Response sent (${duration}ms total)`);
+
+      // Persist chat for daily summaries
+      try {
+        await appendChat(userMessage, response.text, messageTime);
+      } catch (chatError) {
+        console.error("[Chat] Failed to persist:", chatError);
+      }
     } catch (error) {
       stopTyping();
       console.error("[ERR] Error handling message:", error);
