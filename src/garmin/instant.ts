@@ -37,8 +37,12 @@ export async function initInstantClient(): Promise<void> {
     return;
   }
 
-  client = new GarminConnect();
-  await client.login(config.garminEmail(), config.garminPassword());
+  const credentials = {
+    username: config.garminEmail(),
+    password: config.garminPassword(),
+  };
+  client = new GarminConnect(credentials);
+  await client.login();
   initialized = true;
   console.log("[Instant] Garmin Connect client initialized");
 }

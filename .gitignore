@@ -45,3 +45,5 @@ CLAUDE.md
 # SQLite databases
 *.db
 *.db-journal
+data/summaries/
+data/chats/

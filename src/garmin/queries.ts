@@ -25,10 +25,10 @@ export function getTodaysSummary(): DailySummary | null {
     const today = new Date().toISOString().split("T")[0];
     const row = db
       .query<DailySummary, [string]>(
-        `SELECT date, steps, floors, hr_min, hr_max, rhr, stress_avg,
-                bb_max, bb_min, sleep_score
+        `SELECT day as date, steps, floors, hr_min, hr_max, rhr_avg as rhr, stress_avg,
+                bb_max, bb_min, sleep_avg as sleep_score
          FROM days_summary
-         WHERE date = ?`
+         WHERE day = ?`
       )
       .get(today);
     return row || null;
@@ -86,11 +86,11 @@ export function getSleepTrend(days: number = 7): SleepSession[] {
 
     return db
       .query<SleepSession, [string]>(
-        `SELECT date, start_time, end_time, total_sleep,
+        `SELECT day as date, start as start_time, end as end_time, total_sleep,
                 deep_sleep, light_sleep, rem_sleep, awake, score
          FROM sleep
-         WHERE date >= ?
-         ORDER BY date DESC`
+         WHERE day >= ?
+         ORDER BY day DESC`
       )
       .all(cutoffStr);
   } finally {
@@ -108,10 +108,10 @@ export function getWeightTrend(days: number = 30): WeightEntry[] {
 
     return db
       .query<WeightEntry, [string]>(
-        `SELECT date, weight
+        `SELECT day as date, weight
          FROM weight
-         WHERE date >= ?
-         ORDER BY date DESC`
+         WHERE day >= ?
+         ORDER BY day DESC`
       )
       .all(cutoffStr);
   } finally {
@@ -129,10 +129,10 @@ export function getBodyBatteryTrend(days: number = 7): BodyBatteryEntry[] {
 
     return db
       .query<BodyBatteryEntry, [string]>(
-        `SELECT date, bb_max, bb_min
+        `SELECT day as date, bb_max, bb_min
          FROM days_summary
-         WHERE date >= ? AND bb_max IS NOT NULL
-         ORDER BY date DESC`
+         WHERE day >= ? AND bb_max IS NOT NULL
+         ORDER BY day DESC`
       )
       .all(cutoffStr);
   } finally {
