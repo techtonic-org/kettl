@@ -10,6 +10,7 @@ services:
       - ~/HealthData:/root/HealthData
       - ./data/summaries:/app/data/summaries
       - ./data/chats:/app/data/chats
+      - ./data/sessions:/app/data/sessions
     depends_on:
       - mem0
     restart: unless-stopped
