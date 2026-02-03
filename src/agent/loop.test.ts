@@ -1,4 +1,5 @@
 import { describe, test, expect, mock, beforeEach } from "bun:test";
+import type { GeminiMessage } from "./gemini";
 
 // Mock chat function
 const mockChat = mock(() =>
@@ -193,5 +194,25 @@ describe("runAgent", () => {
     const [, tools] = chatCall as [any, any[], string];
     expect(tools).toHaveLength(1);
     expect(tools[0].name).toBe("test_tool");
+  });
+});
+
+describe("runAgent with session history", () => {
+  test("includes session history in conversation", async () => {
+    const sessionHistory: GeminiMessage[] = [
+      { role: "user", parts: [{ text: "Previous question" }] },
+      { role: "model", parts: [{ text: "Previous answer" }] },
+    ];
+
+    await runAgent("New question", "System", sessionHistory);
+
+    // First call should include session history
+    const firstCall = mockChat.mock.calls[0];
+    const [messages] = firstCall as [any[], any, string];
+
+    expect(messages).toHaveLength(3); // 2 history + 1 new
+    expect(messages[0].parts[0].text).toBe("Previous question");
+    expect(messages[1].parts[0].text).toBe("Previous answer");
+    expect(messages[2].parts[0].text).toBe("New question");
   });
 });

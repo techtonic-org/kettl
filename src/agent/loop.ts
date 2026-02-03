@@ -11,10 +11,12 @@ export interface AgentResponse {
 
 export async function runAgent(
   userMessage: string,
-  systemPrompt: string
+  systemPrompt: string,
+  sessionHistory: GeminiMessage[] = []
 ): Promise<AgentResponse> {
   const tools = toolRegistry.getDefinitions();
   const messages: GeminiMessage[] = [
+    ...sessionHistory,
     { role: "user", parts: [{ text: userMessage }] },
   ];
   const toolsUsed: string[] = [];
