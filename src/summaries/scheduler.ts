@@ -44,9 +44,12 @@ export function getMillisecondsToNextSummary(now: Date = new Date()): number {
 }
 
 function getYesterdayDateStr(): string {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  return yesterday.toISOString().split("T")[0];
+  // Get "yesterday" in the configured timezone, not UTC
+  const now = new Date();
+  const todayInTz = now.toLocaleDateString("en-CA", { timeZone: config.timezone }); // YYYY-MM-DD format
+  const todayDate = new Date(todayInTz + "T00:00:00");
+  todayDate.setDate(todayDate.getDate() - 1);
+  return todayDate.toISOString().split("T")[0];
 }
 
 export async function runEodSummary(): Promise<void> {
