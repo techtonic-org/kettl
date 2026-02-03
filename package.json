@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
+    "cli": "bun run src/cli.ts",
     "test": "bun test"
   },
   "dependencies": {
