@@ -45,3 +45,8 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 data/summaries/
 data/chats/
 data/sessions/
+
+# Persistent data (user-specific, not committed)
+data/garmindb/
+data/healthdata/
+data/qdrant/
