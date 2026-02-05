@@ -23,11 +23,58 @@ A self-hosted Telegram health coaching bot. Connects your Garmin data with an LL
 
 ## Quick Start
 
+Create a folder and add two files:
+
+**docker-compose.yml**
+```yaml
+services:
+  kettl:
+    image: ghcr.io/techtonic-org/kettl:latest
+    env_file: .env
+    environment:
+      - TZ=${TZ:-UTC}
+    volumes:
+      - ./data/garmindb:/root/.GarminDb
+      - ./data/healthdata:/root/HealthData
+      - ./data/summaries:/app/data/summaries
+      - ./data/chats:/app/data/chats
+      - ./data/sessions:/app/data/sessions
+    depends_on:
+      - mem0
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    volumes:
+      - ./data/qdrant:/qdrant/storage
+    restart: unless-stopped
+
+  mem0:
+    image: ghcr.io/techtonic-org/kettl-mem0:latest
+    environment:
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - OPENAI_API_KEY=${GEMINI_API_KEY}
+    depends_on:
+      - qdrant
+    restart: unless-stopped
+```
+
+**.env**
 ```bash
-git clone https://github.com/techtonic-org/kettl.git
-cd kettl
-cp .env.example .env
-# Edit .env with your credentials (see Configuration below)
+GARMIN_EMAIL=your-garmin-email
+GARMIN_PASSWORD=your-garmin-password
+TELEGRAM_BOT_TOKEN=your-telegram-bot-token
+GEMINI_API_KEY=your-gemini-api-key
+
+# Optional
+TZ=Europe/London
+GARMIN_START_DATE=2024-01-01
+GARMIN_ACTIVITY_COUNT=200
+```
+
+Then run:
+```bash
 docker compose up -d
 ```
 
@@ -39,29 +86,20 @@ Message your bot on Telegram. That's it.
 
 - Docker and Docker Compose
 - Garmin Connect account with health data
-- Telegram bot token ([create one with @BotFather](https://t.me/botfather))
-- Gemini API key ([get one from Google AI Studio](https://aistudio.google.com/apikey))
+- Telegram bot token ([create with @BotFather](https://t.me/botfather))
+- Gemini API key ([get from Google AI Studio](https://aistudio.google.com/apikey))
 
 ## Configuration
 
-Copy `.env.example` to `.env` and configure:
-
-### Required
-
-| Variable | Description |
-|----------|-------------|
-| `GARMIN_EMAIL` | Your Garmin Connect email |
-| `GARMIN_PASSWORD` | Your Garmin Connect password |
-| `TELEGRAM_BOT_TOKEN` | From @BotFather |
-| `GEMINI_API_KEY` | From Google AI Studio |
-
-### Optional
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `GARMIN_START_DATE` | 6 months ago | How far back to sync metrics (YYYY-MM-DD) |
-| `GARMIN_ACTIVITY_COUNT` | 200 | Number of activities to download |
-| `TZ` | UTC | Your timezone ([list](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)) |
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `GARMIN_EMAIL` | Yes | - | Your Garmin Connect email |
+| `GARMIN_PASSWORD` | Yes | - | Your Garmin Connect password |
+| `TELEGRAM_BOT_TOKEN` | Yes | - | From @BotFather |
+| `GEMINI_API_KEY` | Yes | - | From Google AI Studio |
+| `TZ` | No | UTC | Your timezone ([list](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)) |
+| `GARMIN_START_DATE` | No | 6 months ago | How far back to sync metrics (YYYY-MM-DD) |
+| `GARMIN_ACTIVITY_COUNT` | No | 200 | Number of activities to download |
 
 ### Garmin Sync Details
 
@@ -108,56 +146,6 @@ Three containers:
 - **mem0**: Memory extraction and retrieval service
 - **qdrant**: Vector database for semantic memory search
 
-## Development
-
-### Run Locally
-
-```bash
-# Install Bun
-curl -fsSL https://bun.sh/install | bash
-
-# Install Python dependencies (for GarminDB)
-pip install garmindb
-
-# Install JS dependencies
-bun install
-
-# Run with local services
-docker compose up -d qdrant mem0
-bun run start
-```
-
-### CLI Test Mode
-
-Test without Telegram:
-
-```bash
-bun run cli
-```
-
-### Run Tests
-
-```bash
-bun test
-```
-
-### Local Docker Build
-
-Edit `docker-compose.yml` to use local builds:
-
-```yaml
-services:
-  kettl:
-    # image: ghcr.io/techtonic-org/kettl:latest
-    build: .
-```
-
-Then:
-
-```bash
-docker compose up --build -d
-```
-
 ## Logs & Debugging
 
 ```bash
@@ -173,13 +161,30 @@ docker compose restart kettl
 
 ## Contributing
 
-Contributions welcome! Please:
+Want to contribute? Clone the repo and set up for development:
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests: `bun test`
-5. Submit a pull request
+```bash
+git clone https://github.com/techtonic-org/kettl.git
+cd kettl
+
+# Install Bun
+curl -fsSL https://bun.sh/install | bash
+
+# Install dependencies
+bun install
+pip install garmindb
+
+# Run services + local code
+docker compose up -d qdrant mem0
+bun run start
+
+# Or build and run everything in Docker
+docker compose up --build -d
+```
+
+Run tests with `bun test`. CLI mode (no Telegram): `bun run cli`.
+
+Pull requests welcome!
 
 ## License
 
