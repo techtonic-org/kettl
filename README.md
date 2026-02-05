@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="kettl.png" alt="Kettl" width="200">
+</p>
+
 # Kettl
 
 A self-hosted Telegram health coaching bot. Connects your Garmin data with an LLM that remembers your goals, spots patterns, and holds you accountable.
