@@ -1,13 +1,15 @@
 services:
   kettl:
-    build: .
+    image: ghcr.io/techtonic-org/kettl:latest
+    # For local development, comment out image and uncomment build:
+    # build: .
     env_file:
       - .env
     environment:
-      - TZ=Europe/Budapest
+      - TZ=${TZ:-UTC}
     volumes:
-      - ~/.GarminDb:/root/.GarminDb
-      - ~/HealthData:/root/HealthData
+      - ./data/garmindb:/root/.GarminDb
+      - ./data/healthdata:/root/HealthData
       - ./data/summaries:/app/data/summaries
       - ./data/chats:/app/data/chats
       - ./data/sessions:/app/data/sessions
@@ -17,18 +19,16 @@ services:
 
   qdrant:
     image: qdrant/qdrant:latest
-    ports:
-      - "6333:6333"
     volumes:
-      - qdrant_data:/qdrant/storage
+      - ./data/qdrant:/qdrant/storage
     restart: unless-stopped
 
   mem0:
-    build:
-      context: .
-      dockerfile: mem0.Dockerfile
-    ports:
-      - "8080:8080"
+    image: ghcr.io/techtonic-org/kettl-mem0:latest
+    # For local development, comment out image and uncomment build:
+    # build:
+    #   context: .
+    #   dockerfile: mem0.Dockerfile
     environment:
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
@@ -36,6 +36,3 @@ services:
     depends_on:
       - qdrant
     restart: unless-stopped
-
-volumes:
-  qdrant_data:
