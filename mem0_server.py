@@ -4,8 +4,52 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from mem0 import Memory
+from mem0.embeddings.base import EmbeddingBase
+from mem0.configs.embeddings.base import BaseEmbedderConfig
+import litellm
 
 app = FastAPI(title="Mem0 Server")
+
+
+# Custom litellm embedder with dimension support
+class LitellmEmbedding(EmbeddingBase):
+    """Embedding class using litellm for Gemini embedding models."""
+
+    def __init__(self, config: Optional[BaseEmbedderConfig] = None):
+        super().__init__(config)
+        self.config.model = self.config.model or "gemini/gemini-embedding-001"
+        self.config.embedding_dims = self.config.embedding_dims or 768
+        self.api_key = self.config.api_key or os.getenv("OPENAI_API_KEY")
+
+    def embed(self, text, memory_action=None):
+        """Get embedding using litellm with dimension support."""
+        text = text.replace("\n", " ")
+        response = litellm.embedding(
+            model=self.config.model,
+            input=[text],
+            api_key=self.api_key,
+            dimensions=self.config.embedding_dims
+        )
+        return response.data[0]["embedding"]
+
+
+# Register custom embedder with mem0 by patching the factory
+# Use "gemini" as the provider name to pass validation, but intercept to use our custom class
+from mem0.utils.factory import EmbedderFactory
+from mem0.configs.embeddings.base import BaseEmbedderConfig
+
+_original_create = EmbedderFactory.create
+
+@classmethod
+def _patched_create(cls, provider_name, config):
+    # Intercept "gemini" provider to use our custom litellm-based embedder
+    if provider_name == "gemini":
+        base_config = BaseEmbedderConfig(**config)
+        return LitellmEmbedding(base_config)
+    return _original_create(provider_name, config)
+
+EmbedderFactory.create = _patched_create
+
 
 # Configure mem0 with Qdrant
 config = {
@@ -24,10 +68,11 @@ config = {
         }
     },
     "embedder": {
-        "provider": "litellm",
+        "provider": "gemini",  # Use gemini to pass validation, but factory returns our custom embedder
         "config": {
-            "model": "gemini/text-embedding-004",
-            "api_key": os.getenv("OPENAI_API_KEY"),
+            "model": "gemini/gemini-embedding-001",
+            "embedding_dims": 768,
+            "api_key": os.getenv("OPENAI_API_KEY"),  # Actually Gemini key
         }
     }
 }

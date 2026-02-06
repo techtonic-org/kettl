@@ -1,6 +1,6 @@
 services:
   kettl:
-    image: ghcr.io/techtonic-org/kettl:latest
+    build: .
     env_file: .env
     environment:
       - TZ=${TZ:-UTC}
@@ -21,7 +21,9 @@ services:
     restart: unless-stopped
 
   mem0:
-    image: ghcr.io/techtonic-org/kettl-mem0:latest
+    build:
+      context: .
+      dockerfile: mem0.Dockerfile
     environment:
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
