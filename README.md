@@ -55,6 +55,7 @@ services:
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
       - OPENAI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     depends_on:
       - qdrant
     restart: unless-stopped
