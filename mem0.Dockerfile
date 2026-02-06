@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir mem0ai fastapi uvicorn google-genai
+RUN pip install --no-cache-dir mem0ai fastapi uvicorn litellm
 
 COPY mem0_server.py .
 
