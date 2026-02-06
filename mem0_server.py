@@ -14,7 +14,7 @@ config = {
         "config": {
             "host": os.getenv("QDRANT_HOST", "localhost"),
             "port": int(os.getenv("QDRANT_PORT", 6333)),
-            "embedding_model_dims": 768,  # Gemini text-embedding-004 dimension
+            "embedding_model_dims": 3072,  # Gemini gemini-embedding-001 dimension
         }
     },
     "llm": {
@@ -27,7 +27,7 @@ config = {
     "embedder": {
         "provider": "gemini",
         "config": {
-            "model": "text-embedding-004",
+            "model": "gemini-embedding-001",
             "api_key": os.getenv("OPENAI_API_KEY"),
         }
     }
