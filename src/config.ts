@@ -58,6 +58,12 @@ export const config = {
   chatsPath: expandPath(getEnvOrDefault("CHATS_PATH", "./data/chats")),
   sessionsPath: expandPath(getEnvOrDefault("SESSIONS_PATH", "./data/sessions")),
 
+  // Withings
+  withingsClientId: () => getEnvOrThrow("WITHINGS_CLIENT_ID"),
+  withingsClientSecret: () => getEnvOrThrow("WITHINGS_CLIENT_SECRET"),
+  withingsCallbackUrl: getEnvOrDefault("WITHINGS_CALLBACK_URL", "http://localhost:3000/callback"),
+  withingsTokensPath: expandPath(getEnvOrDefault("WITHINGS_TOKENS_PATH", "./data/withings/tokens.json")),
+
   // Timezone for scheduling (defaults to system timezone)
   timezone: getEnvOrDefault("TZ", "UTC"),
 } as const;

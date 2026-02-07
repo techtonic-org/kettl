@@ -9,6 +9,8 @@ import {
 import { getChatsForDate, type ChatEntry } from "../chats/store";
 import { chat } from "../agent/gemini";
 import { saveInsight } from "../memory/client";
+import { withingsAdapter } from "../adapters/withings";
+import type { BodyCompositionMeasurement } from "../ports/body-composition";
 
 export function getSummaryFilePath(dateStr: string): string {
   return join(config.summariesPath, `${dateStr}.md`);
@@ -30,6 +32,10 @@ Format:
 ## Sleep (previous night)
 - Total sleep, stages breakdown, score
 - Note quality observations
+
+## Body Composition
+- Weight trend, body fat %, muscle mass changes
+- Note if data is from a different day than the summary
 
 ## Chat Interactions
 - Brief summary of what was discussed (if any)
@@ -62,15 +68,26 @@ export async function generateDailySummary(
   console.log(`[Summary] Generating summary for ${dateStr}`);
 
   // Gather data for the specific date
-  const [vitals, activities, sleep, chats] = await Promise.all([
+  const [vitals, activities, sleep, chats, bodyComp] = await Promise.all([
     getSummaryForDate(dateStr),
     getActivitiesForDate(dateStr),
     getSleepForDate(dateStr),
     getChatsForDate(dateStr),
+    withingsAdapter.getForDate(dateStr).catch(() => [] as BodyCompositionMeasurement[]),
   ]);
 
+  // If no same-day body composition, fall back to latest
+  let bodyCompData: { measurement: BodyCompositionMeasurement | null; isFallback: boolean } =
+    { measurement: bodyComp[0] ?? null, isFallback: false };
+  if (!bodyCompData.measurement) {
+    const latest = await withingsAdapter.getLatest().catch(() => null);
+    if (latest) {
+      bodyCompData = { measurement: latest, isFallback: true };
+    }
+  }
+
   // Build data context for LLM
-  const dataContext = buildDataContext(dateStr, vitals, activities, sleep, chats);
+  const dataContext = buildDataContext(dateStr, vitals, activities, sleep, chats, bodyCompData);
 
   // Generate summary with Gemini
   const response = await chat(
@@ -126,12 +143,18 @@ interface SleepData {
   score?: number | null;
 }
 
+interface BodyCompContext {
+  measurement: BodyCompositionMeasurement | null;
+  isFallback: boolean;
+}
+
 function buildDataContext(
   dateStr: string,
   vitals: DailySummaryData | null,
   activities: ActivityData[],
   sleep: SleepData | null,
-  chats: ChatEntry[]
+  chats: ChatEntry[],
+  bodyComp: BodyCompContext = { measurement: null, isFallback: false }
 ): string {
   const sections: string[] = [`Date: ${dateStr}`, ""];
 
@@ -179,6 +202,22 @@ function buildDataContext(
     sections.push(`- Score: ${sleep.score ?? "N/A"}`);
   } else {
     sections.push("No sleep data available");
+  }
+  sections.push("");
+
+  // Body Composition
+  sections.push("BODY COMPOSITION:");
+  if (bodyComp.measurement) {
+    const m = bodyComp.measurement;
+    const fallbackNote = bodyComp.isFallback ? ` (latest, from ${m.date})` : "";
+    sections.push(`- Weight: ${m.weight} kg${fallbackNote}`);
+    if (m.fatPercent != null) sections.push(`- Fat: ${m.fatPercent}%${fallbackNote}`);
+    if (m.muscleMass != null) sections.push(`- Muscle Mass: ${m.muscleMass} kg${fallbackNote}`);
+    if (m.boneMass != null) sections.push(`- Bone Mass: ${m.boneMass} kg${fallbackNote}`);
+    if (m.waterPercent != null) sections.push(`- Water: ${m.waterPercent}%${fallbackNote}`);
+    if (m.bmi != null) sections.push(`- BMI: ${m.bmi}${fallbackNote}`);
+  } else {
+    sections.push("No body composition data available");
   }
   sections.push("");
 

@@ -50,3 +50,7 @@ data/sessions/
 data/garmindb/
 data/healthdata/
 data/qdrant/
+data/withings/
+
+# Withings tokens (may be outside data/ via WITHINGS_TOKENS_PATH)
+withings-tokens.json
