@@ -87,9 +87,9 @@ export async function syncGarmin(): Promise<SyncResult> {
     // Ensure config exists before syncing
     await ensureGarminConfig();
 
-    // Just sync latest activities for fast incremental update
+    // Sync all data types (vitals, sleep, activities, monitoring) with latest data
     const proc = spawn({
-      cmd: ["garmindb_cli.py", "--activities", "--latest", "--download", "--import"],
+      cmd: ["garmindb_cli.py", "--all", "--latest", "--download", "--import", "--analyze"],
       stdout: "pipe",
       stderr: "pipe",
     });
