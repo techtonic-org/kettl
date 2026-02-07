@@ -5,3 +5,4 @@ import "./garmin";
 import "./instant-garmin";
 import "./memory";
 import "./summaries";
+import "./body-composition";

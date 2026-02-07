@@ -44,9 +44,9 @@ describe("Dynamic Prompts", () => {
     expect(prompt).toContain("prefer instant API");
   });
 
-  test("MAIN_PROMPT includes conservative tool guidance", () => {
-    expect(MAIN_PROMPT).toContain("Be conservative with tools");
+  test("MAIN_PROMPT includes tool guidance", () => {
+    expect(MAIN_PROMPT).toContain("think before fetching");
     expect(MAIN_PROMPT).toContain("Don't retry failed tools");
-    expect(MAIN_PROMPT).toContain("Only use save_insight for genuinely useful");
+    expect(MAIN_PROMPT).toContain("genuinely new, useful info worth remembering");
   });
 });

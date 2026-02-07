@@ -39,6 +39,7 @@ services:
       - ./data/summaries:/app/data/summaries
       - ./data/chats:/app/data/chats
       - ./data/sessions:/app/data/sessions
+      - ./data/withings:/app/data/withings
     depends_on:
       - mem0
     restart: unless-stopped
@@ -101,6 +102,10 @@ Message your bot on Telegram. That's it.
 | `TZ` | No | UTC | Your timezone ([list](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)) |
 | `GARMIN_START_DATE` | No | 6 months ago | How far back to sync metrics (YYYY-MM-DD) |
 | `GARMIN_ACTIVITY_COUNT` | No | 200 | Number of activities to download |
+| `WITHINGS_CLIENT_ID` | No | - | Withings API client ID (for body composition) |
+| `WITHINGS_CLIENT_SECRET` | No | - | Withings API client secret |
+| `WITHINGS_CALLBACK_URL` | No | `http://localhost:3000/callback` | OAuth callback URL |
+| `WITHINGS_TOKENS_PATH` | No | `./data/withings/tokens.json` | Token storage path |
 
 ### Garmin Sync Details
 
@@ -110,6 +115,54 @@ The sync uses [GarminDB](https://github.com/tcgoetz/GarminDb) which has two mode
 - **Activities** (`GARMIN_ACTIVITY_COUNT`): Runs, walks, rides - syncs last N activities (not by date)
 
 First sync: 1-2 minutes per month of data. Subsequent syncs: ~10-30 seconds.
+
+### Withings Body Composition (Optional)
+
+If you have a Withings scale, Kettl can pull weight, body fat %, muscle mass, bone mass, water %, and BMI.
+
+**1. Create a Withings Developer App**
+
+Go to https://developer.withings.com/dashboard/, create an app, and set the callback URL to `http://localhost:3000/callback`.
+
+**2. Add to .env**
+
+```bash
+WITHINGS_CLIENT_ID=your_client_id
+WITHINGS_CLIENT_SECRET=your_client_secret
+```
+
+**3. Run the OAuth setup**
+
+```bash
+bun run withings:setup
+# Or in Docker:
+docker compose exec kettl bun run withings:setup
+```
+
+Open the printed URL in your browser and authorize the app. Tokens are saved automatically.
+
+**Running on a headless server?** The setup prints an auth URL. Open it on your local machine, authorize, then when redirected to `localhost:3000/callback?code=...`, exchange the code manually within 30 seconds:
+
+```bash
+curl -s -X POST "https://wbsapi.withings.net/v2/oauth2" \
+  -d "action=requesttoken" \
+  -d "grant_type=authorization_code" \
+  -d "client_id=YOUR_CLIENT_ID" \
+  -d "client_secret=YOUR_CLIENT_SECRET" \
+  -d "code=CODE_FROM_URL" \
+  -d "redirect_uri=http://localhost:3000/callback"
+```
+
+Save the response to `data/withings/tokens.json`:
+```json
+{
+  "access_token": "...",
+  "refresh_token": "...",
+  "expires_at": <current_unix_timestamp + expires_in>
+}
+```
+
+Access tokens expire after 3 hours. Kettl refreshes them automatically.
 
 ## Data Storage
 
@@ -122,7 +175,8 @@ All data lives under `./data/`:
 ├── qdrant/       # Vector storage (memories)
 ├── summaries/    # Daily summary cache
 ├── chats/        # Chat history
-└── sessions/     # Session state
+├── sessions/     # Session state
+└── withings/     # Withings OAuth tokens
 ```
 
 Back up this single folder to preserve everything.
@@ -136,10 +190,10 @@ Back up this single folder to preserve everything.
 └─────────────────────────────────────────────────────┘
         │                              │
         ▼                              ▼
-   ┌─────────┐    ┌─────────┐    ┌─────────┐
-   │  Mem0   │───→│ Qdrant  │    │ Garmin  │
-   │  (API)  │    │(Vectors)│    │(SQLite) │
-   └─────────┘    └─────────┘    └─────────┘
+   ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌──────────┐
+   │  Mem0   │───→│ Qdrant  │    │ Garmin  │    │ Withings │
+   │  (API)  │    │(Vectors)│    │(SQLite) │    │  (API)   │
+   └─────────┘    └─────────┘    └─────────┘    └──────────┘
 ```
 
 Three containers:

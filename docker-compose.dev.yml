@@ -10,6 +10,7 @@ services:
       - ./data/summaries:/app/data/summaries
       - ./data/chats:/app/data/chats
       - ./data/sessions:/app/data/sessions
+      - ./data/withings:/app/data/withings
     depends_on:
       - mem0
     restart: unless-stopped

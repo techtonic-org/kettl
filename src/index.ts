@@ -5,6 +5,7 @@ import { startSyncScheduler, stopSyncScheduler } from "./garmin/scheduler";
 import { startSummaryScheduler, stopSummaryScheduler } from "./summaries/scheduler";
 import { runBackfill } from "./summaries/backfill";
 import { startBot } from "./telegram";
+import { hasTokens } from "./adapters/withings";
 
 console.log("[Startup] Kettl starting...");
 
@@ -29,7 +30,14 @@ async function startup(): Promise<void> {
   // 1. Start initial GarminDB sync (if needed)
   syncGarminBackground();
 
-  // 2. Initialize Garmin Connect API client
+  // 2. Check Withings configuration
+  if (await hasTokens()) {
+    console.log("[Startup] Withings body composition configured");
+  } else {
+    console.log("[Startup] Withings not configured. Run: bun run withings:setup");
+  }
+
+  // 3. Initialize Garmin Connect API client
   try {
     await initInstantClient();
     console.log("[Startup] Instant Garmin client ready");
@@ -37,16 +45,16 @@ async function startup(): Promise<void> {
     console.error("[Startup] Failed to init instant client:", error);
   }
 
-  // 3. Run backfill for missing daily summaries (in background)
+  // 4. Run backfill for missing daily summaries (in background)
   runBackfillAfterSync();
 
-  // 4. Start 4-hour sync scheduler
+  // 5. Start 4-hour sync scheduler
   startSyncScheduler();
 
-  // 5. Start EOD summary scheduler
+  // 6. Start EOD summary scheduler
   startSummaryScheduler();
 
-  // 6. Start Telegram bot
+  // 7. Start Telegram bot
   await startBot();
 }
 

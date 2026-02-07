@@ -4,7 +4,6 @@ import {
   getRecentActivities,
   getActivityDetails,
   getSleepTrend,
-  getWeightTrend,
   getBodyBatteryTrend,
   queryGarmin,
 } from "../garmin";
@@ -94,27 +93,6 @@ toolRegistry.register(
   async (args) => {
     const days = typeof args.days === "number" ? args.days : 7;
     return getSleepTrend(days);
-  }
-);
-
-// get_weight_trend
-toolRegistry.register(
-  {
-    name: "get_weight_trend",
-    description: "Get weight measurements over N days.",
-    parameters: {
-      type: "object",
-      properties: {
-        days: {
-          type: "number",
-          description: "Number of days to look back (default: 30)",
-        },
-      },
-    },
-  },
-  async (args) => {
-    const days = typeof args.days === "number" ? args.days : 30;
-    return getWeightTrend(days);
   }
 );
 

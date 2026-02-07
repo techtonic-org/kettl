@@ -75,7 +75,11 @@ export function buildMainPrompt(context: PromptContext): string {
 
 **SQLite Data (GarminDB):** Last synced ${context.lastSyncAgo} (${context.lastSyncTime.toISOString()})
 - Use for: trends, historical analysis, aggregates, detailed activity breakdowns
-- Tools: get_recent_activities, get_sleep_trend, get_weight_trend, get_body_battery_trend, query_garmin
+- Tools: get_recent_activities, get_sleep_trend, get_body_battery_trend, query_garmin
+
+**Body Composition (Withings):** Real-time from Withings API
+- Use for: weight, body fat %, muscle mass, bone mass, water %, BMI
+- Tools: get_latest_weight, get_weight_trend
 
 **Instant API:** Real-time, always fresh
 - Use for: anything that happened since last sync, current state

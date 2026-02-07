@@ -6,7 +6,8 @@
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
     "cli": "bun run src/cli.ts",
-    "test": "for f in src/**/*.test.ts src/*.test.ts; do bun test \"$f\" || exit 1; done"
+    "test": "for f in src/**/*.test.ts src/*.test.ts; do bun test \"$f\" || exit 1; done",
+    "withings:setup": "bun run src/adapters/withings/setup.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
