@@ -1,6 +1,5 @@
 import { toolRegistry } from "./registry";
 import {
-  syncGarmin,
   getRecentActivities,
   getActivityDetails,
   getSleepTrend,
@@ -8,26 +7,8 @@ import {
   queryGarmin,
 } from "../garmin";
 
-// sync_garmin
-toolRegistry.register(
-  {
-    name: "sync_garmin",
-    description:
-      "Force refresh data from Garmin Connect. Use when data might be stale or user just completed an activity.",
-    parameters: {
-      type: "object",
-      properties: {},
-    },
-  },
-  async () => {
-    const result = await syncGarmin();
-    if (result.success) {
-      return { synced: true, durationMs: result.durationMs };
-    } else {
-      return { synced: false, error: result.error };
-    }
-  }
-);
+// Note: sync_garmin tool removed — GarminDB sync takes several minutes and is
+// only run on a schedule (every N hours + EOD). Use instant API tools for fresh data.
 
 // get_recent_activities
 toolRegistry.register(
