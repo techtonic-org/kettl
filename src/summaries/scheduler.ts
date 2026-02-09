@@ -55,13 +55,32 @@ function getYesterdayDateStr(): string {
 export async function runEodSummary(): Promise<void> {
   console.log("[EOD] Starting end-of-day summary generation");
 
-  // Force sync before generating summary
-  console.log("[EOD] Running forced Garmin sync");
-  try {
-    await syncGarmin();
-    console.log("[EOD] Garmin sync completed");
-  } catch (error) {
-    console.error("[EOD] Garmin sync failed, continuing with summary:", error);
+  // Force sync before generating summary, with retry on failure
+  let syncSucceeded = false;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    console.log(`[EOD] Running forced Garmin sync (attempt ${attempt}/2)`);
+    try {
+      const result = await syncGarmin();
+      console.log(`[EOD] Garmin sync ${result.success ? "completed" : "FAILED"} in ${Math.round(result.durationMs / 1000)}s${result.error ? `: ${result.error}` : ""}`);
+      if (result.success) {
+        syncSucceeded = true;
+        break;
+      }
+      if (attempt < 2) {
+        console.log("[EOD] Retrying sync in 10s...");
+        await new Promise(r => setTimeout(r, 10_000));
+      }
+    } catch (error) {
+      console.error(`[EOD] Garmin sync threw an exception:`, error);
+      if (attempt < 2) {
+        console.log("[EOD] Retrying sync in 10s...");
+        await new Promise(r => setTimeout(r, 10_000));
+      }
+    }
+  }
+
+  if (!syncSucceeded) {
+    console.warn("[EOD] Garmin sync failed after 2 attempts, summary will use instant API fallback");
   }
 
   // Generate summary for yesterday

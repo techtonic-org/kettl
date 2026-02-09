@@ -6,6 +6,11 @@ import {
   getActivitiesForDate,
   getSleepForDate,
 } from "../garmin/queries";
+import {
+  getCurrentVitals,
+  getTodaysSleep,
+  isInstantClientInitialized,
+} from "../garmin/instant";
 import { getChatsForDate, type ChatEntry } from "../chats/store";
 import { chat } from "../agent/gemini";
 import { saveInsight } from "../memory/client";
@@ -76,6 +81,48 @@ export async function generateDailySummary(
     withingsAdapter.getForDate(dateStr).catch(() => [] as BodyCompositionMeasurement[]),
   ]);
 
+  // Fall back to instant API if SQLite has no vitals/sleep data
+  let finalVitals: DailySummaryData | null = vitals;
+  let finalSleep: SleepData | null = sleep;
+
+  if (!vitals && isInstantClientInitialized()) {
+    console.log(`[Summary] No SQLite vitals for ${dateStr}, trying instant API fallback`);
+    try {
+      const instant = await getCurrentVitals();
+      finalVitals = {
+        date: dateStr,
+        steps: instant.steps,
+        rhr: instant.restingHr,
+        stress_avg: instant.stressLevel,
+        bb_max: instant.bodyBatteryHigh,
+        bb_min: instant.bodyBatteryLow,
+      };
+      console.log(`[Summary] Got vitals from instant API: ${instant.steps} steps`);
+    } catch (error) {
+      console.error(`[Summary] Instant vitals fallback failed:`, error);
+    }
+  }
+
+  if (!sleep && isInstantClientInitialized()) {
+    console.log(`[Summary] No SQLite sleep for ${dateStr}, trying instant API fallback`);
+    try {
+      const instantSleep = await getTodaysSleep();
+      if (instantSleep) {
+        // Convert seconds to HH:MM:SS format to match SQLite format
+        finalSleep = {
+          total_sleep: secondsToTimeStr(instantSleep.totalSleep),
+          deep_sleep: secondsToTimeStr(instantSleep.deepSleep),
+          light_sleep: secondsToTimeStr(instantSleep.lightSleep),
+          rem_sleep: secondsToTimeStr(instantSleep.remSleep),
+          score: instantSleep.score,
+        };
+        console.log(`[Summary] Got sleep from instant API: score ${instantSleep.score}`);
+      }
+    } catch (error) {
+      console.error(`[Summary] Instant sleep fallback failed:`, error);
+    }
+  }
+
   // If no same-day body composition, fall back to latest
   let bodyCompData: { measurement: BodyCompositionMeasurement | null; isFallback: boolean } =
     { measurement: bodyComp[0] ?? null, isFallback: false };
@@ -87,7 +134,7 @@ export async function generateDailySummary(
   }
 
   // Build data context for LLM
-  const dataContext = buildDataContext(dateStr, vitals, activities, sleep, chats, bodyCompData);
+  const dataContext = buildDataContext(dateStr, finalVitals, activities, finalSleep, chats, bodyCompData);
 
   // Generate summary with Gemini
   const response = await chat(
@@ -235,6 +282,13 @@ function buildDataContext(
   }
 
   return sections.join("\n");
+}
+
+function secondsToTimeStr(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.000000`;
 }
 
 function formatDistanceKm(km: number | null | undefined): string {

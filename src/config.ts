@@ -40,7 +40,7 @@ export const config = {
   mem0Url: getEnvOrDefault("MEM0_URL", "http://localhost:8080"),
 
   // Timeouts (ms)
-  garminSyncTimeout: 120_000,
+  garminSyncTimeout: 600_000,
   geminiTimeout: 60_000,
   overallTimeout: 90_000,
 
